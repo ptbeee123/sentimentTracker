@@ -190,7 +190,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             </span>
             {eventMarkers.length > 0 && (
               <span className="ml-2 text-xs text-green-400">
-                • {eventMarkers.length} key event{eventMarkers.length > 1 ? 's' : ''} marked
+                • {eventMarkers.length} key event{eventMarkers.length > 1 ? 's' : ''} on timeline
               </span>
             )}
           </p>
@@ -261,46 +261,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         </div>
       </div>
 
-      {/* FIXED: Event Legend - Always show if there are events, with better visibility */}
-      {eventMarkers.length > 0 && (
-        <div className="mb-4 p-4 bg-slate-900 rounded-lg border border-slate-600">
-          <div className="flex items-center space-x-2 mb-3">
-            <div className="text-sm font-medium text-white">Key Events in Timeline:</div>
-            {hasVerifiedCrisis && (
-              <div className="flex items-center space-x-1">
-                {getVerificationIcon()}
-                <span className="text-xs text-green-400">Verified</span>
-              </div>
-            )}
-          </div>
-          <div className="grid grid-cols-1 gap-2">
-            {eventMarkers.map((marker, index) => (
-              <div key={index} className="flex items-center justify-between p-2 bg-slate-800 rounded border-l-4" 
-                   style={{ borderLeftColor: marker.color }}>
-                <div className="flex items-center space-x-3">
-                  <div 
-                    className="w-3 h-3 rounded-full flex-shrink-0" 
-                    style={{ backgroundColor: marker.color }}
-                  ></div>
-                  <div className="flex-1">
-                    <div className="text-sm text-white font-medium">{marker.label}</div>
-                    <div className="text-xs text-slate-400">
-                      {format(marker.event.date, 'MMM dd, yyyy')} • {marker.event.type}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-sm font-mono ${
-                    marker.event.impact > 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {marker.event.impact > 0 ? '+' : ''}{marker.event.impact}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* REMOVED: Event Legend - No longer showing key events in UI, only on timeline */}
 
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
