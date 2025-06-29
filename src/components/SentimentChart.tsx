@@ -33,31 +33,55 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     }
   };
 
-  const { chartData, filteredEvents, dateRange, rangeMetrics } = useMemo(() => {
+  const { chartData, filteredEvents, dateRange, rangeMetrics, eventMarkers } = useMemo(() => {
     const dateRange = getDateRange(timeframe);
     
-    // FIXED: Use correct dataset based on timeframe
+    // Use correct dataset based on timeframe
     let dataset = timeframe === '24h' ? hourlyData : data;
     
-    // FIXED: Apply precise filtering based on exact date range
+    // Apply precise filtering based on exact date range
     const filteredData = filterDataByDateRange(dataset, dateRange);
     
-    // Only show events if they are verified and within exact date range
-    const filteredEvents = hasVerifiedCrisis ? 
-      filterEventsByDateRange(events, dateRange) : [];
+    // Filter events within the date range
+    const filteredEvents = filterEventsByDateRange(events, dateRange);
     
     // Calculate metrics for this exact filtered data
     const rangeMetrics = calculateRangeMetrics(filteredData, dateRange);
     
-    // FIXED: Format chart data with consistent date formatting and preserve original timestamps
+    // Format chart data with consistent date formatting
     const chartData = filteredData.map(item => ({
       ...item,
       formattedTime: format(item.timestamp, dateRange.formatString),
       originalTimestamp: item.timestamp
     }));
 
-    return { chartData, filteredEvents, dateRange, rangeMetrics };
-  }, [timeframe, data, hourlyData, events, hasVerifiedCrisis]);
+    // FIXED: Create event markers that align with chart data points
+    const eventMarkers = filteredEvents.map(event => {
+      // Find the closest data point to the event date
+      let closestDataPoint = chartData[0];
+      let minTimeDiff = Infinity;
+      
+      chartData.forEach(point => {
+        const timeDiff = Math.abs(point.originalTimestamp.getTime() - event.date.getTime());
+        if (timeDiff < minTimeDiff) {
+          minTimeDiff = timeDiff;
+          closestDataPoint = point;
+        }
+      });
+
+      return {
+        event,
+        dataPoint: closestDataPoint,
+        xValue: closestDataPoint?.formattedTime || format(event.date, dateRange.formatString),
+        color: event.type === 'crisis' ? '#EF4444' : 
+               event.type === 'response' ? '#3B82F6' : 
+               event.type === 'announcement' ? '#10B981' : '#F59E0B',
+        label: event.title.length > 25 ? event.title.substring(0, 25) + '...' : event.title
+      };
+    });
+
+    return { chartData, filteredEvents, dateRange, rangeMetrics, eventMarkers };
+  }, [timeframe, data, hourlyData, events]);
 
   const getVerificationIcon = () => {
     if (!hasVerifiedCrisis) return null;
@@ -74,6 +98,10 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      
+      // Check if there's an event at this data point
+      const eventAtPoint = eventMarkers.find(marker => marker.xValue === label);
+      
       return (
         <div className="bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-lg">
           <p className="text-slate-300 font-medium">{label}</p>
@@ -89,6 +117,40 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
           <p className="text-xs text-slate-500 mt-1">
             {format(data.originalTimestamp, 'MMM dd, yyyy HH:mm')}
           </p>
+          
+          {/* Show event information if there's an event at this point */}
+          {eventAtPoint && (
+            <div className="mt-3 pt-3 border-t border-slate-600">
+              <div className="flex items-center space-x-2 mb-1">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: eventAtPoint.color }}
+                ></div>
+                <span className="text-xs font-medium text-white">Crisis Event</span>
+              </div>
+              <p className="text-sm text-slate-200 font-medium">
+                {eventAtPoint.event.title}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                {eventAtPoint.event.description}
+              </p>
+              <div className="flex items-center justify-between mt-2 text-xs">
+                <span className={`px-2 py-1 rounded ${
+                  eventAtPoint.event.type === 'crisis' ? 'bg-red-500/20 text-red-400' :
+                  eventAtPoint.event.type === 'response' ? 'bg-blue-500/20 text-blue-400' :
+                  eventAtPoint.event.type === 'announcement' ? 'bg-green-500/20 text-green-400' :
+                  'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {eventAtPoint.event.type}
+                </span>
+                <span className={`font-mono ${
+                  eventAtPoint.event.impact > 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {eventAtPoint.event.impact > 0 ? '+' : ''}{eventAtPoint.event.impact}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -115,9 +177,9 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             <span className="ml-2 text-xs">
               ({getDateRangeDisplayString(dateRange)})
             </span>
-            {hasVerifiedCrisis && (
+            {hasVerifiedCrisis && eventMarkers.length > 0 && (
               <span className="ml-2 text-xs text-green-400">
-                • Multi-source verified crisis events
+                • {eventMarkers.length} key event{eventMarkers.length > 1 ? 's' : ''} marked
               </span>
             )}
           </p>
@@ -139,7 +201,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         </div>
       </div>
 
-      {/* FIXED: Range Metrics Summary - Now shows accurate data for selected timeframe */}
+      {/* Range Metrics Summary */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900 rounded-lg p-3">
           <div className="text-xs text-slate-400">Average Sentiment</div>
@@ -176,17 +238,38 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         
         <div className="bg-slate-900 rounded-lg p-3">
           <div className="flex items-center space-x-1 text-xs text-slate-400">
-            <span>Verified Events</span>
+            <span>Key Events</span>
             {hasVerifiedCrisis && getVerificationIcon()}
           </div>
           <div className="text-lg font-medium text-white">
-            {filteredEvents.length}
+            {eventMarkers.length}
           </div>
           <div className="text-xs text-slate-500">
-            {hasVerifiedCrisis ? 'Multi-source verified' : 'No verified events'}
+            {hasVerifiedCrisis ? 'Verified & marked' : 'No verified events'}
           </div>
         </div>
       </div>
+
+      {/* Event Legend - Show if there are events */}
+      {eventMarkers.length > 0 && (
+        <div className="mb-4 p-3 bg-slate-900 rounded-lg">
+          <div className="text-xs text-slate-400 mb-2">Key Events Legend:</div>
+          <div className="flex flex-wrap gap-3">
+            {eventMarkers.map((marker, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: marker.color }}
+                ></div>
+                <span className="text-xs text-slate-300">{marker.label}</span>
+                <span className="text-xs text-slate-500">
+                  ({format(marker.event.date, 'MMM dd')})
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
@@ -206,34 +289,23 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="2 2" />
             
-            {/* FIXED: Crisis events positioning - only show if verified and for appropriate timeframes */}
-            {hasVerifiedCrisis && (timeframe === '30d' || timeframe === '1y' || timeframe === 'all') && 
-             filteredEvents.map((event, index) => {
-               // Find the closest data point to the event date for accurate positioning
-               const eventTime = event.date.getTime();
-               const closestDataPoint = chartData.reduce((closest, point) => {
-                 const pointTime = point.originalTimestamp.getTime();
-                 const closestTime = closest.originalTimestamp.getTime();
-                 return Math.abs(pointTime - eventTime) < Math.abs(closestTime - eventTime) ? point : closest;
-               }, chartData[0]);
-
-               if (!closestDataPoint) return null;
-
-               return (
-                 <ReferenceLine
-                   key={index}
-                   x={closestDataPoint.formattedTime}
-                   stroke={event.type === 'crisis' ? '#EF4444' : event.type === 'response' ? '#3B82F6' : '#10B981'}
-                   strokeDasharray="4 4"
-                   label={{ 
-                     value: event.title.substring(0, 20) + (event.title.length > 20 ? '...' : ''), 
-                     position: 'topLeft', 
-                     fontSize: 10,
-                     fill: event.type === 'crisis' ? '#EF4444' : event.type === 'response' ? '#3B82F6' : '#10B981'
-                   }}
-                 />
-               );
-             })}
+            {/* FIXED: Crisis event markers - properly positioned and visible */}
+            {eventMarkers.map((marker, index) => (
+              <ReferenceLine
+                key={`event-${index}`}
+                x={marker.xValue}
+                stroke={marker.color}
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                label={{ 
+                  value: `${marker.event.type.toUpperCase()}: ${marker.label}`, 
+                  position: index % 2 === 0 ? 'topLeft' : 'topRight',
+                  fontSize: 10,
+                  fill: marker.color,
+                  fontWeight: 'bold'
+                }}
+              />
+            ))}
             
             <Line
               type="monotone"
@@ -262,7 +334,9 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         <div className="flex items-center space-x-4">
           <span>Data Points: <span className="text-white font-mono">{chartData.length.toLocaleString()}</span></span>
           <span>Date Range: <span className="text-blue-400">{getDateRangeDisplayString(dateRange)}</span></span>
-          <span>Crisis Recovery Benchmark: <span className="text-yellow-400">Day +60 target</span></span>
+          {eventMarkers.length > 0 && (
+            <span>Key Events: <span className="text-yellow-400 font-mono">{eventMarkers.length}</span></span>
+          )}
         </div>
       </div>
     </div>
