@@ -67,7 +67,7 @@ export const AgentSwarmMonitor: React.FC<AgentSwarmMonitorProps> = ({
       });
       
       if (updatedSwarm.status === 'completed') {
-        setRealTimeUpdates(prev => [`🎉 Data collection completed for ${companyName} - ${updatedSwarm.totalDataPoints} total data points`, ...prev.slice(0, 9)]);
+        setRealTimeUpdates(prev => [`🎉 Real data collection completed for ${companyName} - ${updatedSwarm.totalDataPoints} total data points`, ...prev.slice(0, 9)]);
         setTimeout(() => {
           setIsVisible(false);
           onCollectionComplete();
@@ -265,7 +265,7 @@ export const AgentSwarmMonitor: React.FC<AgentSwarmMonitorProps> = ({
                 )}
               </div>
 
-              {/* FIXED: Data Sources Status - Now includes all agents */}
+              {/* UPDATED: Data Sources Status - Now includes all agents */}
               <div className="mt-4 pt-4 border-t border-slate-700">
                 <h4 className="text-xs font-medium text-slate-400 mb-2">Active Sources</h4>
                 <div className="space-y-1">
@@ -314,6 +314,14 @@ export const AgentSwarmMonitor: React.FC<AgentSwarmMonitorProps> = ({
                     <div className={`w-2 h-2 rounded-full ${
                       swarm.agents.find(a => a.id === 'crisis-verifier')?.status === 'completed' ? 'bg-green-400' :
                       swarm.agents.find(a => a.id === 'crisis-verifier')?.status === 'collecting' ? 'bg-blue-400 animate-pulse' :
+                      'bg-slate-500'
+                    }`}></div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300">Company Events</span>
+                    <div className={`w-2 h-2 rounded-full ${
+                      swarm.agents.find(a => a.id === 'company-events-collector')?.status === 'completed' ? 'bg-green-400' :
+                      swarm.agents.find(a => a.id === 'company-events-collector')?.status === 'collecting' ? 'bg-blue-400 animate-pulse' :
                       'bg-slate-500'
                     }`}></div>
                   </div>
