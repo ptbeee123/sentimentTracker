@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { Shield, CheckCircle, AlertTriangle } from 'lucide-react';
-import { getDateRange, filterDataByDateRange, filterEventsByDateRange, calculateRangeMetrics } from '../utils/dateUtils';
+import { getDateRange, filterDataByDateRange, filterEventsByDateRange, calculateRangeMetrics, getDateRangeDisplayString } from '../utils/dateUtils';
 import type { SentimentData, CrisisEvent } from '../types/dashboard';
 
 interface SentimentChartProps {
@@ -35,25 +35,25 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
 
   const { chartData, filteredEvents, dateRange, rangeMetrics } = useMemo(() => {
     const dateRange = getDateRange(timeframe);
-    let dataset = data;
     
-    if (timeframe === '24h') {
-      dataset = hourlyData;
-    }
+    // FIXED: Use correct dataset based on timeframe
+    let dataset = timeframe === '24h' ? hourlyData : data;
     
-    // Filter data based on date range
+    // FIXED: Apply precise filtering based on exact date range
     const filteredData = filterDataByDateRange(dataset, dateRange);
     
-    // Only show events if they are verified
+    // Only show events if they are verified and within exact date range
     const filteredEvents = hasVerifiedCrisis ? 
       filterEventsByDateRange(events, dateRange) : [];
     
-    // Calculate metrics for this range
+    // Calculate metrics for this exact filtered data
     const rangeMetrics = calculateRangeMetrics(filteredData, dateRange);
     
+    // FIXED: Format chart data with consistent date formatting and preserve original timestamps
     const chartData = filteredData.map(item => ({
       ...item,
-      formattedTime: format(item.timestamp, dateRange.formatString)
+      formattedTime: format(item.timestamp, dateRange.formatString),
+      originalTimestamp: item.timestamp
     }));
 
     return { chartData, filteredEvents, dateRange, rangeMetrics };
@@ -86,6 +86,9 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
           <p className="text-yellow-400">
             Confidence: <span className="font-mono">{(data.confidence * 100).toFixed(1)}%</span>
           </p>
+          <p className="text-xs text-slate-500 mt-1">
+            {format(data.originalTimestamp, 'MMM dd, yyyy HH:mm')}
+          </p>
         </div>
       );
     }
@@ -110,7 +113,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
           <p className="text-sm text-slate-400">
             Real-time sentiment analysis for <span className="text-blue-400 font-medium">{companyName}</span>
             <span className="ml-2 text-xs">
-              ({dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()})
+              ({getDateRangeDisplayString(dateRange)})
             </span>
             {hasVerifiedCrisis && (
               <span className="ml-2 text-xs text-green-400">
@@ -136,7 +139,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         </div>
       </div>
 
-      {/* Range Metrics Summary */}
+      {/* FIXED: Range Metrics Summary - Now shows accurate data for selected timeframe */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900 rounded-lg p-3">
           <div className="text-xs text-slate-400">Average Sentiment</div>
@@ -164,7 +167,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         <div className="bg-slate-900 rounded-lg p-3">
           <div className="text-xs text-slate-400">Data Points</div>
           <div className="text-lg font-medium text-white">
-            {rangeMetrics.dataPoints.toLocaleString()}
+            {chartData.length.toLocaleString()}
           </div>
           <div className="text-xs text-slate-500">
             {dateRange.label}
@@ -193,6 +196,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
               dataKey="formattedTime" 
               stroke="#9CA3AF"
               fontSize={12}
+              interval="preserveStartEnd"
             />
             <YAxis 
               stroke="#9CA3AF"
@@ -202,22 +206,34 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="2 2" />
             
-            {/* Crisis events as reference lines - only show if verified */}
+            {/* FIXED: Crisis events positioning - only show if verified and for appropriate timeframes */}
             {hasVerifiedCrisis && (timeframe === '30d' || timeframe === '1y' || timeframe === 'all') && 
-             filteredEvents.map((event, index) => (
-              <ReferenceLine
-                key={index}
-                x={format(event.date, dateRange.formatString)}
-                stroke={event.type === 'crisis' ? '#EF4444' : event.type === 'response' ? '#3B82F6' : '#10B981'}
-                strokeDasharray="4 4"
-                label={{ 
-                  value: event.title.substring(0, 20) + (event.title.length > 20 ? '...' : ''), 
-                  position: 'topLeft', 
-                  fontSize: 10,
-                  fill: event.type === 'crisis' ? '#EF4444' : event.type === 'response' ? '#3B82F6' : '#10B981'
-                }}
-              />
-            ))}
+             filteredEvents.map((event, index) => {
+               // Find the closest data point to the event date for accurate positioning
+               const eventTime = event.date.getTime();
+               const closestDataPoint = chartData.reduce((closest, point) => {
+                 const pointTime = point.originalTimestamp.getTime();
+                 const closestTime = closest.originalTimestamp.getTime();
+                 return Math.abs(pointTime - eventTime) < Math.abs(closestTime - eventTime) ? point : closest;
+               }, chartData[0]);
+
+               if (!closestDataPoint) return null;
+
+               return (
+                 <ReferenceLine
+                   key={index}
+                   x={closestDataPoint.formattedTime}
+                   stroke={event.type === 'crisis' ? '#EF4444' : event.type === 'response' ? '#3B82F6' : '#10B981'}
+                   strokeDasharray="4 4"
+                   label={{ 
+                     value: event.title.substring(0, 20) + (event.title.length > 20 ? '...' : ''), 
+                     position: 'topLeft', 
+                     fontSize: 10,
+                     fill: event.type === 'crisis' ? '#EF4444' : event.type === 'response' ? '#3B82F6' : '#10B981'
+                   }}
+                 />
+               );
+             })}
             
             <Line
               type="monotone"
@@ -245,7 +261,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         </div>
         <div className="flex items-center space-x-4">
           <span>Data Points: <span className="text-white font-mono">{chartData.length.toLocaleString()}</span></span>
-          <span>Date Range: <span className="text-blue-400">{dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}</span></span>
+          <span>Date Range: <span className="text-blue-400">{getDateRangeDisplayString(dateRange)}</span></span>
           <span>Crisis Recovery Benchmark: <span className="text-yellow-400">Day +60 target</span></span>
         </div>
       </div>

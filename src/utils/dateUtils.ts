@@ -1,4 +1,4 @@
-import { format, startOfYear, endOfDay, subDays, subHours, isAfter, isBefore, isWithinInterval } from 'date-fns';
+import { format, startOfYear, endOfDay, subDays, subHours, isAfter, isBefore, isWithinInterval, startOfDay, endOfHour, startOfHour } from 'date-fns';
 
 // Date range constants aligned to January 1, 2025
 export const DATA_START_DATE = new Date('2025-01-01T00:00:00Z');
@@ -26,29 +26,29 @@ export const getDateRange = (period: '24h' | '7d' | '30d' | '1y' | 'all'): DateR
         totalDays: 1
       };
     case '7d':
-      const start7d = subDays(now, 7);
+      const start7d = startOfDay(subDays(now, 7));
       return {
         start: start7d,
-        end: now,
+        end: endOfDay(now),
         formatString: 'MMM dd',
         label: 'Last 7 Days',
         totalDays: 7
       };
     case '30d':
-      const start30d = subDays(now, 30);
+      const start30d = startOfDay(subDays(now, 30));
       return {
         start: start30d,
-        end: now,
+        end: endOfDay(now),
         formatString: 'MMM dd',
         label: 'Last 30 Days',
         totalDays: 30
       };
     case '1y':
-      const start1y = subDays(now, 365);
+      const start1y = startOfDay(subDays(now, 365));
       return {
         start: start1y,
-        end: now,
-        formatString: 'MMM yyyy',
+        end: endOfDay(now),
+        formatString: 'MMM dd',
         label: 'Last Year',
         totalDays: 365
       };
@@ -57,9 +57,9 @@ export const getDateRange = (period: '24h' | '7d' | '30d' | '1y' | 'all'): DateR
       const totalDays = Math.ceil((now.getTime() - DATA_START_DATE.getTime()) / (1000 * 60 * 60 * 24));
       return {
         start: DATA_START_DATE,
-        end: now,
-        formatString: 'MMM dd, yyyy',
-        label: 'All Time',
+        end: endOfDay(now),
+        formatString: 'MMM dd',
+        label: `All Time (${totalDays} days)`,
         totalDays
       };
   }
@@ -92,31 +92,44 @@ export const getDataCollectionStatus = (dateRange?: DateRange) => {
   };
 };
 
-// Filter data arrays by date range
+// FIXED: More precise date range filtering
 export const filterDataByDateRange = <T extends { timestamp: Date }>(
   data: T[], 
   dateRange: DateRange
 ): T[] => {
-  return data.filter(item => isDateInRange(item.timestamp, dateRange.start, dateRange.end));
+  return data.filter(item => {
+    const itemTime = item.timestamp.getTime();
+    const startTime = dateRange.start.getTime();
+    const endTime = dateRange.end.getTime();
+    return itemTime >= startTime && itemTime <= endTime;
+  });
 };
 
-// Filter crisis events by date range
+// FIXED: More precise date range filtering for events
 export const filterEventsByDateRange = <T extends { date: Date }>(
   events: T[], 
   dateRange: DateRange
 ): T[] => {
-  return events.filter(event => isDateInRange(event.date, dateRange.start, dateRange.end));
+  return events.filter(event => {
+    const eventTime = event.date.getTime();
+    const startTime = dateRange.start.getTime();
+    const endTime = dateRange.end.getTime();
+    return eventTime >= startTime && eventTime <= endTime;
+  });
 };
 
-// Calculate metrics for a specific date range - FIXED: Ensure proper volume calculation
+// FIXED: Ensure proper volume calculation with accurate date filtering
 export const calculateRangeMetrics = (
   data: Array<{ timestamp: Date; sentiment: number; volume: number }>,
   dateRange: DateRange
 ) => {
-  // Ensure we're working with filtered data
-  const filteredData = data.filter(item => 
-    isDateInRange(item.timestamp, dateRange.start, dateRange.end)
-  );
+  // Double-check filtering with exact date range
+  const filteredData = data.filter(item => {
+    const itemTime = item.timestamp.getTime();
+    const startTime = dateRange.start.getTime();
+    const endTime = dateRange.end.getTime();
+    return itemTime >= startTime && itemTime <= endTime;
+  });
   
   if (filteredData.length === 0) {
     return {
@@ -128,7 +141,7 @@ export const calculateRangeMetrics = (
     };
   }
 
-  // Calculate total volume by summing all volume values in the range
+  // Calculate total volume by summing all volume values in the exact range
   const totalVolume = filteredData.reduce((sum, item) => sum + (item.volume || 0), 0);
   
   // Calculate average sentiment
@@ -156,9 +169,54 @@ export const calculateRangeMetrics = (
 
   return {
     averageSentiment: Math.round(averageSentiment),
-    totalVolume: Math.round(totalVolume), // This is now the actual sum of all volumes in range
+    totalVolume: Math.round(totalVolume),
     dataPoints: filteredData.length,
-    sentimentTrend: Math.round(sentimentTrend * 10) / 10, // Round to 1 decimal
+    sentimentTrend: Math.round(sentimentTrend * 10) / 10,
     volumeTrend: Math.round(volumeTrend * 10) / 10
   };
+};
+
+// NEW: Normalize date for consistent comparison
+export const normalizeDate = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+// NEW: Check if two dates are the same day
+export const isSameDay = (date1: Date, date2: Date): boolean => {
+  return normalizeDate(date1).getTime() === normalizeDate(date2).getTime();
+};
+
+// NEW: Get the current timeframe's expected data points for accurate display
+export const getTimeframeDataPoints = (timeframe: '24h' | '7d' | '30d' | '1y' | 'all'): number => {
+  switch (timeframe) {
+    case '24h': return 24; // Hourly data points
+    case '7d': return 7; // Daily data points
+    case '30d': return 30; // Daily data points
+    case '1y': return 365; // Daily data points
+    case 'all': 
+    default:
+      const now = new Date();
+      return Math.ceil((now.getTime() - DATA_START_DATE.getTime()) / (1000 * 60 * 60 * 24));
+  }
+};
+
+// NEW: Validate that data point falls within expected timeframe
+export const isDataPointInTimeframe = (
+  dataTimestamp: Date, 
+  timeframe: '24h' | '7d' | '30d' | '1y' | 'all'
+): boolean => {
+  const range = getDateRange(timeframe);
+  return isDateInRange(dataTimestamp, range.start, range.end);
+};
+
+// NEW: Get accurate date range display string
+export const getDateRangeDisplayString = (dateRange: DateRange): string => {
+  const startStr = format(dateRange.start, 'MMM dd, yyyy');
+  const endStr = format(dateRange.end, 'MMM dd, yyyy');
+  
+  if (startStr === endStr) {
+    return startStr;
+  }
+  
+  return `${startStr} - ${endStr}`;
 };
