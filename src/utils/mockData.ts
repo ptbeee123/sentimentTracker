@@ -381,7 +381,7 @@ export const getMockCompetitorData = (companyName: string = 'GlobalTech Industri
   });
 };
 
-// UPDATED: Now uses Crisis Validation Service for real data validation
+// UPDATED: Now generates ALL key events, not just crisis events
 export const getMockCrisisEvents = async (companyName: string = 'GlobalTech Industries'): Promise<CrisisEvent[]> => {
   try {
     // First try to get validated crisis events from real data sources
@@ -389,131 +389,239 @@ export const getMockCrisisEvents = async (companyName: string = 'GlobalTech Indu
     
     if (validationResult.isValid && validationResult.verifiedEvents.length > 0) {
       // Convert validated events to dashboard format
-      return validationResult.verifiedEvents.map(event => ({
+      const crisisEvents = validationResult.verifiedEvents.map(event => ({
         date: event.date,
         title: event.title,
         type: event.type,
         impact: event.impact,
         description: event.description
       }));
+      
+      // Add additional key business events (non-crisis)
+      const additionalEvents = generateKeyBusinessEvents(companyName);
+      
+      // Combine and sort all events
+      return [...crisisEvents, ...additionalEvents].sort((a, b) => a.date.getTime() - b.date.getTime());
     }
   } catch (error) {
     console.warn('Crisis validation failed, falling back to generated events:', error);
   }
 
   // Fallback to generated events if validation fails or no real events found
-  return generateFallbackCrisisEvents(companyName);
+  return generateAllKeyEvents(companyName);
 };
 
-// FIXED: Company-specific crisis events with proper timing
-const generateFallbackCrisisEvents = (companyName: string): CrisisEvent[] => {
+// NEW: Generate comprehensive key business events (not just crisis)
+const generateAllKeyEvents = (companyName: string): CrisisEvent[] => {
   const context = getCompanyContext(companyName);
   const companySeed = generateCompanySpecificSeed(companyName);
   
-  // Industry-specific crisis scenarios
-  const getCrisisScenarios = (industry: string) => {
-    const scenarios = {
-      technology: [
-        { title: 'Data Security Incident', type: 'crisis' as const, impact: -85 },
-        { title: 'Product Recall Announcement', type: 'crisis' as const, impact: -45 },
-        { title: 'AI Ethics Investigation', type: 'external' as const, impact: -35 }
-      ],
-      financial: [
-        { title: 'Regulatory Compliance Violation', type: 'crisis' as const, impact: -90 },
-        { title: 'Trading Algorithm Malfunction', type: 'crisis' as const, impact: -65 },
-        { title: 'Federal Reserve Investigation', type: 'external' as const, impact: -40 }
-      ],
-      healthcare: [
-        { title: 'Clinical Trial Safety Concerns', type: 'crisis' as const, impact: -80 },
-        { title: 'FDA Warning Letter', type: 'external' as const, impact: -50 },
-        { title: 'Patient Data Breach', type: 'crisis' as const, impact: -70 }
-      ],
-      energy: [
-        { title: 'Environmental Incident', type: 'crisis' as const, impact: -95 },
-        { title: 'Safety Protocol Violation', type: 'crisis' as const, impact: -60 },
-        { title: 'EPA Investigation', type: 'external' as const, impact: -45 }
-      ],
-      retail: [
-        { title: 'Supply Chain Disruption', type: 'crisis' as const, impact: -55 },
-        { title: 'Customer Data Breach', type: 'crisis' as const, impact: -70 },
-        { title: 'Product Safety Recall', type: 'crisis' as const, impact: -40 }
-      ],
-      automotive: [
-        { title: 'Vehicle Safety Defect', type: 'crisis' as const, impact: -75 },
-        { title: 'Manufacturing Quality Issues', type: 'crisis' as const, impact: -50 },
-        { title: 'NHTSA Investigation', type: 'external' as const, impact: -35 }
-      ]
-    };
-    return scenarios[industry] || scenarios.technology;
-  };
+  const events: CrisisEvent[] = [];
+  const startDate = new Date('2025-01-01T00:00:00Z');
   
-  const crisisScenarios = getCrisisScenarios(context.industry);
+  // Generate a comprehensive timeline of key business events
+  const eventTemplates = getIndustryEventTemplates(context.industry, companyName);
   
-  // FIXED: Use company-specific crisis timing
-  const crisisStartDay = getCompanyCrisisDay(companyName);
+  eventTemplates.forEach((template, index) => {
+    const eventDate = addDays(startDate, template.dayOffset);
+    
+    events.push({
+      date: eventDate,
+      title: template.title,
+      type: template.type,
+      impact: Math.round(template.impact + (companySeed - 0.5) * 10),
+      description: template.description
+    });
+  });
+
+  return events.sort((a, b) => a.date.getTime() - b.date.getTime());
+};
+
+// NEW: Generate additional key business events to supplement crisis events
+const generateKeyBusinessEvents = (companyName: string): CrisisEvent[] => {
+  const context = getCompanyContext(companyName);
+  const companySeed = generateCompanySpecificSeed(companyName);
   
   const events: CrisisEvent[] = [];
-  const startDate = new Date('2025-01-01T00:00:00Z'); // Use 2025 start date
+  const startDate = new Date('2025-01-01T00:00:00Z');
   
-  // Initial crisis event
-  events.push({
-    date: addDays(startDate, crisisStartDay),
-    title: `${companyName} ${crisisScenarios[0].title}`,
-    type: crisisScenarios[0].type,
-    impact: crisisScenarios[0].impact,
-    description: `Major ${context.industry} sector incident affecting ${companyName} operations`
-  });
-  
-  // CEO/Executive response
-  events.push({
-    date: addDays(startDate, crisisStartDay + 2),
-    title: `${companyName} Executive Leadership Response`,
-    type: 'response',
-    impact: Math.round(Math.max(-100, Math.min(100, 15 + companySeed * 20))), // Round to whole number
-    description: `${companyName} leadership announces comprehensive action plan and accountability measures`
-  });
-  
-  // Regulatory/External response
-  if (crisisScenarios[2]) {
+  // Generate positive business events and announcements
+  const businessEventTemplates = [
+    {
+      title: `${companyName} Q1 Earnings Announcement`,
+      type: 'announcement' as const,
+      impact: 15,
+      dayOffset: 90,
+      description: `${companyName} releases Q1 financial results and provides business outlook.`
+    },
+    {
+      title: `${companyName} Strategic Partnership Initiative`,
+      type: 'announcement' as const,
+      impact: 25,
+      dayOffset: 45,
+      description: `${companyName} announces new strategic partnerships to expand market reach.`
+    },
+    {
+      title: `${companyName} Product Innovation Launch`,
+      type: 'announcement' as const,
+      impact: 20,
+      dayOffset: 120,
+      description: `${companyName} unveils innovative product offerings for ${context.industry} market.`
+    },
+    {
+      title: `${companyName} Leadership Transition`,
+      type: 'announcement' as const,
+      impact: -5,
+      dayOffset: 60,
+      description: `${companyName} announces executive leadership changes and organizational restructuring.`
+    },
+    {
+      title: `${companyName} Market Expansion Strategy`,
+      type: 'announcement' as const,
+      impact: 30,
+      dayOffset: 150,
+      description: `${companyName} reveals plans for geographic and market segment expansion.`
+    },
+    {
+      title: `${companyName} Sustainability Initiative`,
+      type: 'announcement' as const,
+      impact: 18,
+      dayOffset: 180,
+      description: `${companyName} launches comprehensive sustainability and ESG program.`
+    },
+    {
+      title: `${companyName} Technology Investment`,
+      type: 'announcement' as const,
+      impact: 22,
+      dayOffset: 210,
+      description: `${companyName} announces significant technology infrastructure investments.`
+    },
+    {
+      title: `${companyName} Customer Success Milestone`,
+      type: 'announcement' as const,
+      impact: 12,
+      dayOffset: 240,
+      description: `${companyName} achieves major customer satisfaction and retention milestones.`
+    }
+  ];
+
+  businessEventTemplates.forEach((template, index) => {
+    const eventDate = addDays(startDate, template.dayOffset + Math.floor((companySeed - 0.5) * 30));
+    
     events.push({
-      date: addDays(startDate, crisisStartDay + 8),
-      title: `${companyName} ${crisisScenarios[2].title}`,
-      type: crisisScenarios[2].type,
-      impact: crisisScenarios[2].impact,
-      description: `Government agency announces formal investigation into ${companyName} practices`
+      date: eventDate,
+      title: template.title,
+      type: template.type,
+      impact: Math.round(template.impact + (companySeed - 0.5) * 8),
+      description: template.description
     });
-  }
-  
-  // Corrective measures
-  events.push({
-    date: addDays(startDate, crisisStartDay + 15),
-    title: `${companyName} Comprehensive Reform Package`,
-    type: 'announcement',
-    impact: Math.round(Math.max(-100, Math.min(100, 25 + companySeed * 15))), // Round to whole number
-    description: `${companyName} implements multi-phase corrective action plan with third-party oversight`
   });
-  
-  // Third-party validation
-  events.push({
-    date: addDays(startDate, crisisStartDay + 30),
-    title: `${companyName} Independent Audit Results`,
-    type: 'external',
-    impact: Math.round(Math.max(-100, Math.min(100, 18 + companySeed * 12))), // Round to whole number
-    description: `Third-party audit confirms ${companyName} implementation of corrective measures`
-  });
-  
-  // Industry recognition (if recovery is going well)
-  if (companySeed > 0.4) {
-    events.push({
-      date: addDays(startDate, crisisStartDay + 50),
-      title: `${companyName} Industry Leadership Recognition`,
-      type: 'external',
-      impact: Math.round(Math.max(-100, Math.min(100, 20 + companySeed * 15))), // Round to whole number
-      description: `Industry association recognizes ${companyName} transparency and accountability efforts`
-    });
-  }
-  
+
   return events;
+};
+
+// NEW: Get industry-specific event templates
+const getIndustryEventTemplates = (industry: string, companyName: string) => {
+  const baseTemplates = [
+    {
+      title: `${companyName} Annual Shareholder Meeting`,
+      type: 'announcement' as const,
+      impact: 10,
+      dayOffset: 100,
+      description: `${companyName} holds annual shareholder meeting with strategic updates.`
+    },
+    {
+      title: `${companyName} Regulatory Filing Update`,
+      type: 'external' as const,
+      impact: -8,
+      dayOffset: 130,
+      description: `Regulatory authorities review ${companyName} compliance documentation.`
+    },
+    {
+      title: `${companyName} Industry Conference Presentation`,
+      type: 'announcement' as const,
+      impact: 15,
+      dayOffset: 160,
+      description: `${companyName} leadership presents at major ${industry} industry conference.`
+    },
+    {
+      title: `${companyName} Quarterly Business Review`,
+      type: 'announcement' as const,
+      impact: 8,
+      dayOffset: 190,
+      description: `${companyName} conducts comprehensive quarterly business performance review.`
+    }
+  ];
+
+  const industrySpecific = {
+    technology: [
+      {
+        title: `${companyName} Security Enhancement Program`,
+        type: 'response' as const,
+        impact: 25,
+        dayOffset: 220,
+        description: `${companyName} implements comprehensive cybersecurity enhancement program.`
+      },
+      {
+        title: `${companyName} AI Innovation Initiative`,
+        type: 'announcement' as const,
+        impact: 35,
+        dayOffset: 250,
+        description: `${companyName} launches artificial intelligence and automation initiatives.`
+      }
+    ],
+    financial: [
+      {
+        title: `${companyName} Risk Management Update`,
+        type: 'announcement' as const,
+        impact: 20,
+        dayOffset: 220,
+        description: `${companyName} enhances risk management and compliance frameworks.`
+      },
+      {
+        title: `${companyName} Digital Banking Launch`,
+        type: 'announcement' as const,
+        impact: 30,
+        dayOffset: 250,
+        description: `${companyName} introduces next-generation digital banking services.`
+      }
+    ],
+    healthcare: [
+      {
+        title: `${companyName} Clinical Trial Results`,
+        type: 'announcement' as const,
+        impact: 40,
+        dayOffset: 220,
+        description: `${companyName} announces positive clinical trial outcomes for key treatments.`
+      },
+      {
+        title: `${companyName} FDA Collaboration`,
+        type: 'external' as const,
+        impact: 25,
+        dayOffset: 250,
+        description: `${companyName} collaborates with FDA on regulatory pathway development.`
+      }
+    ],
+    energy: [
+      {
+        title: `${companyName} Renewable Energy Investment`,
+        type: 'announcement' as const,
+        impact: 35,
+        dayOffset: 220,
+        description: `${companyName} announces major renewable energy infrastructure investments.`
+      },
+      {
+        title: `${companyName} Environmental Compliance`,
+        type: 'response' as const,
+        impact: 20,
+        dayOffset: 250,
+        description: `${companyName} implements enhanced environmental compliance measures.`
+      }
+    ]
+  };
+
+  const specificTemplates = industrySpecific[industry] || industrySpecific.technology;
+  return [...baseTemplates, ...specificTemplates];
 };
 
 // COMPLETELY REWRITTEN: Now uses Validator Agent for 100% company-specific content
@@ -558,7 +666,7 @@ export const generateCompanyMetrics = async (companyName: string): Promise<Compa
     const geographicData = getMockGeographicData(companyName);
     const competitorData = getMockCompetitorData(companyName);
     
-    // UPDATED: Use validated crisis events (async)
+    // UPDATED: Use comprehensive key events (not just crisis events)
     const crisisEvents = await getMockCrisisEvents(companyName);
     const threatsOpportunities = getMockThreatsOpportunities(companyName);
 

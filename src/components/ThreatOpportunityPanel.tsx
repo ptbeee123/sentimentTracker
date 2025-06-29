@@ -8,8 +8,57 @@ interface ThreatOpportunityPanelProps {
 }
 
 export const ThreatOpportunityPanel: React.FC<ThreatOpportunityPanelProps> = ({ items, companyName }) => {
-  const threats = items.filter(item => item.type === 'threat');
-  const opportunities = items.filter(item => item.type === 'opportunity');
+  // FIXED: Filter out non-company-centric threats and opportunities
+  const filterCompanyCentricItems = (items: ThreatOpportunity[]) => {
+    return items.filter(item => {
+      const title = item.title.toLowerCase();
+      const description = item.description.toLowerCase();
+      const content = `${title} ${description}`;
+      const company = companyName.toLowerCase();
+      
+      // Must mention the company name specifically
+      if (!content.includes(company)) {
+        return false;
+      }
+      
+      // Filter out generic industry articles that aren't company-specific
+      const genericKeywords = [
+        'industry trends', 'market analysis', 'sector outlook', 'general market',
+        'industry report', 'market research', 'sector analysis', 'industry study',
+        'market trends', 'industry overview', 'sector trends', 'market outlook'
+      ];
+      
+      const hasGenericKeywords = genericKeywords.some(keyword => content.includes(keyword));
+      if (hasGenericKeywords && !content.includes(`${company} specifically`)) {
+        return false;
+      }
+      
+      // Ensure the threat/opportunity is directly related to the company
+      const companySpecificIndicators = [
+        `${company} faces`, `${company} announces`, `${company} reports`,
+        `${company} investigation`, `${company} lawsuit`, `${company} partnership`,
+        `${company} acquisition`, `${company} merger`, `${company} expansion`,
+        `${company} leadership`, `${company} ceo`, `${company} executive`,
+        `${company} board`, `${company} shareholders`, `${company} customers`,
+        `${company} operations`, `${company} business`, `${company} strategy`,
+        `${company} financial`, `${company} revenue`, `${company} earnings`,
+        `${company} compliance`, `${company} regulatory`, `${company} security`
+      ];
+      
+      const hasCompanySpecificContent = companySpecificIndicators.some(indicator => 
+        content.includes(indicator)
+      );
+      
+      // If no specific indicators, check if company name appears multiple times
+      const companyMentions = (content.match(new RegExp(company, 'g')) || []).length;
+      
+      return hasCompanySpecificContent || companyMentions >= 2;
+    });
+  };
+
+  const filteredItems = filterCompanyCentricItems(items);
+  const threats = filteredItems.filter(item => item.type === 'threat');
+  const opportunities = filteredItems.filter(item => item.type === 'opportunity');
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -110,10 +159,10 @@ export const ThreatOpportunityPanel: React.FC<ThreatOpportunityPanelProps> = ({ 
           {item.verifiedUrl ? (
             <span className="flex items-center space-x-1">
               <CheckCircle className="h-3 w-3 text-green-400" />
-              <span>Click to read verified article from {item.source || 'trusted source'}</span>
+              <span>Click to read verified {companyName}-specific article from {item.source || 'trusted source'}</span>
             </span>
           ) : (
-            "Click to search for related business news articles"
+            `Click to search for ${companyName}-specific business news articles`
           )}
         </div>
       </div>
@@ -124,7 +173,7 @@ export const ThreatOpportunityPanel: React.FC<ThreatOpportunityPanelProps> = ({ 
     <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
       <div className="flex items-center space-x-2 mb-4">
         <Zap className="h-5 w-5 text-yellow-400" />
-        <h3 className="text-lg font-medium text-white">Emerging Threats & Opportunities</h3>
+        <h3 className="text-lg font-medium text-white">Company-Specific Threats & Opportunities</h3>
         <div className="flex items-center space-x-1 text-xs text-green-400">
           <CheckCircle className="h-3 w-3" />
           <span>Verified Sources</span>
@@ -135,15 +184,15 @@ export const ThreatOpportunityPanel: React.FC<ThreatOpportunityPanelProps> = ({ 
         <div>
           <h4 className="text-sm font-medium text-red-400 mb-3 flex items-center space-x-2">
             <AlertTriangle className="h-4 w-4" />
-            <span>Active Business Threats</span>
+            <span>{companyName}-Specific Business Threats</span>
             {threats.length > 0 && (
               <span className="text-xs text-slate-400">({threats.length} detected)</span>
             )}
           </h4>
           {threats.length === 0 ? (
             <div className="bg-slate-900 rounded-lg p-4 text-center">
-              <p className="text-slate-400 text-sm">No active business threats detected</p>
-              <p className="text-xs text-slate-500 mt-1">AI monitoring continues...</p>
+              <p className="text-slate-400 text-sm">No company-specific business threats detected</p>
+              <p className="text-xs text-slate-500 mt-1">AI monitoring continues for {companyName}...</p>
             </div>
           ) : (
             threats.map(threat => (
@@ -155,14 +204,14 @@ export const ThreatOpportunityPanel: React.FC<ThreatOpportunityPanelProps> = ({ 
         <div>
           <h4 className="text-sm font-medium text-green-400 mb-3 flex items-center space-x-2">
             <TrendingUp className="h-4 w-4" />
-            <span>Emerging Business Opportunities</span>
+            <span>{companyName}-Specific Business Opportunities</span>
             {opportunities.length > 0 && (
               <span className="text-xs text-slate-400">({opportunities.length} identified)</span>
             )}
           </h4>
           {opportunities.length === 0 ? (
             <div className="bg-slate-900 rounded-lg p-4 text-center">
-              <p className="text-slate-400 text-sm">Scanning for business opportunities...</p>
+              <p className="text-slate-400 text-sm">Scanning for {companyName}-specific business opportunities...</p>
               <p className="text-xs text-slate-500 mt-1">AI analysis in progress...</p>
             </div>
           ) : (
@@ -176,30 +225,30 @@ export const ThreatOpportunityPanel: React.FC<ThreatOpportunityPanelProps> = ({ 
       <div className="mt-6 p-3 bg-slate-900 rounded-lg border border-slate-600">
         <div className="text-xs text-slate-400 mb-1 flex items-center space-x-1">
           <Zap className="h-3 w-3" />
-          <span>AI-Powered Business Intelligence System</span>
+          <span>AI-Powered {companyName} Intelligence System</span>
           <CheckCircle className="h-3 w-3 text-green-400" />
-          <span className="text-green-400">Verified Sources</span>
+          <span className="text-green-400">Company-Specific Filtering</span>
         </div>
         <div className="text-sm text-white">
           {threats.filter(t => t.priority === 'critical').length > 0 ? (
             <>
-              {threats.filter(t => t.priority === 'critical').length} critical business threat{threats.filter(t => t.priority === 'critical').length > 1 ? 's' : ''} require immediate attention for {companyName}.
+              {threats.filter(t => t.priority === 'critical').length} critical {companyName}-specific threat{threats.filter(t => t.priority === 'critical').length > 1 ? 's' : ''} require immediate attention.
             </>
           ) : (
-            <>No critical business threats detected.</>
+            <>No critical {companyName}-specific threats detected.</>
           )} {' '}
           {opportunities.filter(o => o.priority === 'high').length > 0 ? (
             <>
-              {opportunities.filter(o => o.priority === 'high').length} high-value business opportunit{opportunities.filter(o => o.priority === 'high').length > 1 ? 'ies' : 'y'} identified 
+              {opportunities.filter(o => o.priority === 'high').length} high-value {companyName}-specific opportunit{opportunities.filter(o => o.priority === 'high').length > 1 ? 'ies' : 'y'} identified 
               for strategic planning.
             </>
           ) : (
-            <>Monitoring for strategic business opportunities.</>
+            <>Monitoring for strategic {companyName}-specific opportunities.</>
           )}
         </div>
         <div className="text-xs text-slate-500 mt-2 flex items-center space-x-1">
           <CheckCircle className="h-3 w-3 text-green-400" />
-          <span>All sources verified from Reuters, AP, BBC, Financial Times, and Wall Street Journal</span>
+          <span>All sources verified and filtered for {companyName} relevance from Reuters, AP, BBC, Financial Times, and Wall Street Journal</span>
         </div>
       </div>
     </div>
