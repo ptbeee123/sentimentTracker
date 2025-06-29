@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
-import { Shield, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Shield, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react';
 import { getDateRange, filterDataByDateRange, filterEventsByDateRange, calculateRangeMetrics, getDateRangeDisplayString } from '../utils/dateUtils';
 import type { SentimentData, CrisisEvent } from '../types/dashboard';
 
@@ -105,6 +105,54 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     }
   };
 
+  // FIXED: Extract and clean URLs from event descriptions
+  const extractEventUrl = (event: any): string | null => {
+    if (!event || !event.description) return null;
+    
+    // Look for URLs in the description
+    const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
+    const urls = event.description.match(urlRegex);
+    
+    if (urls && urls.length > 0) {
+      // Clean the URL by removing any trailing HTML entities or characters
+      let cleanUrl = urls[0]
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ');
+      
+      // Remove any trailing punctuation or HTML tags
+      cleanUrl = cleanUrl.replace(/[<>"'\s]+$/, '');
+      
+      return cleanUrl;
+    }
+    
+    return null;
+  };
+
+  // FIXED: Handle event URL clicks properly
+  const handleEventUrlClick = (event: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const eventUrl = extractEventUrl(event);
+    if (eventUrl) {
+      try {
+        window.open(eventUrl, '_blank', 'noopener,noreferrer');
+      } catch (error) {
+        console.error('Error opening event URL:', error);
+        // Fallback to Google search
+        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`"${companyName}" "${event.title}"`)}`;
+        window.open(searchUrl, '_blank', 'noopener,noreferrer');
+      }
+    } else {
+      // Fallback to Google search if no URL found
+      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`"${companyName}" "${event.title}"`)}`;
+      window.open(searchUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -128,7 +176,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             {format(data.originalTimestamp, 'MMM dd, yyyy HH:mm')}
           </p>
           
-          {/* Show event information if there's an event at this point */}
+          {/* FIXED: Show event information with proper URL handling */}
           {eventAtPoint && (
             <div className="mt-3 pt-3 border-t border-slate-600">
               <div className="flex items-center space-x-2 mb-1">
@@ -160,6 +208,20 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
                   {eventAtPoint.event.impact > 0 ? '+' : ''}{eventAtPoint.event.impact}
                 </span>
               </div>
+              
+              {/* FIXED: Add clickable link if URL is available */}
+              {extractEventUrl(eventAtPoint.event) && (
+                <div className="mt-2 pt-2 border-t border-slate-600">
+                  <button
+                    onClick={(e) => handleEventUrlClick(eventAtPoint.event, e)}
+                    className="flex items-center space-x-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    title="Click to read full article"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    <span>Read full article</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -260,8 +322,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
           </div>
         </div>
       </div>
-
-      {/* REMOVED: Event Legend - No longer showing key events in UI, only on timeline */}
 
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
