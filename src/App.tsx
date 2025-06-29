@@ -28,6 +28,7 @@ function App() {
   const [selectedTimeframe, setSelectedTimeframe] = useState<'24h' | '7d' | '30d' | '1y' | 'all'>('30d');
   const [hasVerifiedCrisis, setHasVerifiedCrisis] = useState(false);
   const [crisisVerificationConfidence, setCrisisVerificationConfidence] = useState(0);
+  const [totalCollectedDataPoints, setTotalCollectedDataPoints] = useState(0); // NEW: Track total collected data points
 
   // Section collapse states
   const [sectionStates, setSectionStates] = useState({
@@ -186,6 +187,7 @@ function App() {
     setSelectedTimeframe('30d');
     setHasVerifiedCrisis(false);
     setCrisisVerificationConfidence(0);
+    setTotalCollectedDataPoints(0); // Reset collected data points
     
     // Activate agent swarm for new company
     loadCompanyMetrics(newCompanyName.trim(), true);
@@ -225,6 +227,12 @@ function App() {
     
     setHasVerifiedCrisis(hasVerified);
     setCrisisVerificationConfidence(verificationResult?.confidence || 0);
+    
+    // FIXED: Get total collected data points from agent swarm
+    const swarm = agentSwarmService.getSwarm();
+    if (swarm) {
+      setTotalCollectedDataPoints(swarm.totalDataPoints);
+    }
     
     if (collectedMetrics) {
       // Use the metrics collected by the agent swarm
@@ -394,12 +402,6 @@ function App() {
     );
   }
 
-  // FIXED: Calculate actual data points from filtered metrics
-  const actualDataPoints = filteredMetrics.sentimentData.length + 
-                           (filteredMetrics.hourlyData?.length || 0) + 
-                           filteredMetrics.crisisEvents.length + 
-                           filteredMetrics.threatsOpportunities.length;
-
   // Render dashboard with validated and filtered metrics
   return (
     <div className="min-h-screen bg-slate-900">
@@ -438,8 +440,8 @@ function App() {
             </div>
             <div className="flex items-center space-x-6 text-sm text-slate-400">
               <span>Total Days: <span className="text-white font-mono">{dataStatus.totalDays}</span></span>
-              {/* FIXED: Show actual collected data points instead of estimated */}
-              <span>Data Points: <span className="text-white font-mono">{actualDataPoints.toLocaleString()}</span></span>
+              {/* FIXED: Show actual collected data points from agents */}
+              <span>Collected Data: <span className="text-white font-mono">{totalCollectedDataPoints.toLocaleString()}</span></span>
               <span>Last Update: <span className="text-green-400 font-mono">
                 {dataStatus.lastUpdate.toLocaleTimeString('en-US', { 
                   timeZone: 'America/New_York',
@@ -477,6 +479,7 @@ function App() {
             onTimeframeChange={handleTimeframeChange}
             hasVerifiedCrisis={hasVerifiedCrisis}
             crisisVerificationConfidence={crisisVerificationConfidence}
+            totalCollectedDataPoints={totalCollectedDataPoints} // FIXED: Pass total collected data points
           />
         </CollapsibleSection>
 
@@ -607,6 +610,10 @@ function App() {
                 </span>
               </>
             )}
+            {' | '}
+            <span className="text-blue-400">
+              Collected Data: {totalCollectedDataPoints.toLocaleString()} points
+            </span>
           </div>
         </div>
       </footer>

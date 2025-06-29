@@ -13,6 +13,7 @@ interface SentimentChartProps {
   onTimeframeChange?: (timeframe: '24h' | '7d' | '30d' | '1y' | 'all') => void;
   hasVerifiedCrisis?: boolean;
   crisisVerificationConfidence?: number;
+  totalCollectedDataPoints?: number; // NEW: Pass total collected data points from agents
 }
 
 export const SentimentChart: React.FC<SentimentChartProps> = ({ 
@@ -22,7 +23,8 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   companyName,
   onTimeframeChange,
   hasVerifiedCrisis = false,
-  crisisVerificationConfidence = 0
+  crisisVerificationConfidence = 0,
+  totalCollectedDataPoints = 0 // NEW: Default to 0 if not provided
 }) => {
   const [timeframe, setTimeframe] = useState<'24h' | '7d' | '30d' | '1y' | 'all'>('30d');
 
@@ -304,13 +306,14 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
           </div>
         </div>
         
+        {/* FIXED: Show actual collected data points from agents instead of chart data points */}
         <div className="bg-slate-900 rounded-lg p-3">
-          <div className="text-xs text-slate-400">Data Points</div>
+          <div className="text-xs text-slate-400">Collected Data Points</div>
           <div className="text-lg font-medium text-white">
-            {chartData.length.toLocaleString()}
+            {totalCollectedDataPoints.toLocaleString()}
           </div>
           <div className="text-xs text-slate-500">
-            {dateRange.label}
+            From agent collection
           </div>
         </div>
         
@@ -405,7 +408,9 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
           )}
         </div>
         <div className="flex items-center space-x-4">
-          <span>Data Points: <span className="text-white font-mono">{chartData.length.toLocaleString()}</span></span>
+          {/* FIXED: Show chart data points separately from collected data points */}
+          <span>Chart Points: <span className="text-white font-mono">{chartData.length.toLocaleString()}</span></span>
+          <span>Collected Data: <span className="text-blue-400 font-mono">{totalCollectedDataPoints.toLocaleString()}</span></span>
           <span>Date Range: <span className="text-blue-400">{getDateRangeDisplayString(dateRange)}</span></span>
           {eventMarkers.length > 0 && (
             <span>Key Events: <span className="text-yellow-400 font-mono">{eventMarkers.length}</span></span>
