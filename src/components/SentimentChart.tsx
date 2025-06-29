@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
+import { Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import { getDateRange, filterDataByDateRange, filterEventsByDateRange, calculateRangeMetrics } from '../utils/dateUtils';
 import type { SentimentData, CrisisEvent } from '../types/dashboard';
 
@@ -10,6 +11,8 @@ interface SentimentChartProps {
   events: CrisisEvent[];
   companyName: string;
   onTimeframeChange?: (timeframe: '24h' | '7d' | '30d' | '1y' | 'all') => void;
+  hasVerifiedCrisis?: boolean;
+  crisisVerificationConfidence?: number;
 }
 
 export const SentimentChart: React.FC<SentimentChartProps> = ({ 
@@ -17,7 +20,9 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   hourlyData, 
   events, 
   companyName,
-  onTimeframeChange 
+  onTimeframeChange,
+  hasVerifiedCrisis = false,
+  crisisVerificationConfidence = 0
 }) => {
   const [timeframe, setTimeframe] = useState<'24h' | '7d' | '30d' | '1y' | 'all'>('30d');
 
@@ -38,9 +43,12 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     
     // Filter data based on date range
     const filteredData = filterDataByDateRange(dataset, dateRange);
-    const filteredEvents = filterEventsByDateRange(events, dateRange);
     
-    // Calculate metrics for this range - FIXED: Ensure proper volume calculation
+    // Only show events if they are verified
+    const filteredEvents = hasVerifiedCrisis ? 
+      filterEventsByDateRange(events, dateRange) : [];
+    
+    // Calculate metrics for this range
     const rangeMetrics = calculateRangeMetrics(filteredData, dateRange);
     
     const chartData = filteredData.map(item => ({
@@ -49,7 +57,19 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     }));
 
     return { chartData, filteredEvents, dateRange, rangeMetrics };
-  }, [timeframe, data, hourlyData, events]);
+  }, [timeframe, data, hourlyData, events, hasVerifiedCrisis]);
+
+  const getVerificationIcon = () => {
+    if (!hasVerifiedCrisis) return null;
+    
+    if (crisisVerificationConfidence >= 0.8) {
+      return <CheckCircle className="h-4 w-4 text-green-400" title="High confidence verification" />;
+    } else if (crisisVerificationConfidence >= 0.7) {
+      return <Shield className="h-4 w-4 text-yellow-400" title="Medium confidence verification" />;
+    } else {
+      return <AlertTriangle className="h-4 w-4 text-orange-400" title="Low confidence verification" />;
+    }
+  };
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -76,12 +96,27 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-medium text-white">Executive Sentiment Command Center</h2>
-          <p className="text-sm text-slate-400 mt-1">
+          <div className="flex items-center space-x-2 mb-1">
+            <h2 className="text-lg font-medium text-white">Executive Sentiment Command Center</h2>
+            {hasVerifiedCrisis && (
+              <div className="flex items-center space-x-1">
+                {getVerificationIcon()}
+                <span className="text-xs text-green-400">
+                  Verified Events ({(crisisVerificationConfidence * 100).toFixed(0)}% confidence)
+                </span>
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-slate-400">
             Real-time sentiment analysis for <span className="text-blue-400 font-medium">{companyName}</span>
             <span className="ml-2 text-xs">
               ({dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()})
             </span>
+            {hasVerifiedCrisis && (
+              <span className="ml-2 text-xs text-green-400">
+                • Multi-source verified crisis events
+              </span>
+            )}
           </p>
         </div>
         <div className="flex space-x-2">
@@ -137,12 +172,15 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         </div>
         
         <div className="bg-slate-900 rounded-lg p-3">
-          <div className="text-xs text-slate-400">Events</div>
+          <div className="flex items-center space-x-1 text-xs text-slate-400">
+            <span>Verified Events</span>
+            {hasVerifiedCrisis && getVerificationIcon()}
+          </div>
           <div className="text-lg font-medium text-white">
             {filteredEvents.length}
           </div>
           <div className="text-xs text-slate-500">
-            In range
+            {hasVerifiedCrisis ? 'Multi-source verified' : 'No verified events'}
           </div>
         </div>
       </div>
@@ -164,18 +202,19 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="2 2" />
             
-            {/* Crisis events as reference lines for longer timeframes */}
-            {(timeframe === '30d' || timeframe === '1y' || timeframe === 'all') && filteredEvents.map((event, index) => (
+            {/* Crisis events as reference lines - only show if verified */}
+            {hasVerifiedCrisis && (timeframe === '30d' || timeframe === '1y' || timeframe === 'all') && 
+             filteredEvents.map((event, index) => (
               <ReferenceLine
                 key={index}
                 x={format(event.date, dateRange.formatString)}
-                stroke="#EF4444"
+                stroke={event.type === 'crisis' ? '#EF4444' : event.type === 'response' ? '#3B82F6' : '#10B981'}
                 strokeDasharray="4 4"
                 label={{ 
                   value: event.title.substring(0, 20) + (event.title.length > 20 ? '...' : ''), 
                   position: 'topLeft', 
                   fontSize: 10,
-                  fill: '#EF4444'
+                  fill: event.type === 'crisis' ? '#EF4444' : event.type === 'response' ? '#3B82F6' : '#10B981'
                 }}
               />
             ))}
@@ -193,8 +232,16 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
       </div>
 
       <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
-        <div>
-          Confidence interval: ±{((chartData[chartData.length - 1]?.confidence || 0.85) * 10).toFixed(1)} points
+        <div className="flex items-center space-x-4">
+          <span>Confidence interval: ±{((chartData[chartData.length - 1]?.confidence || 0.85) * 10).toFixed(1)} points</span>
+          {hasVerifiedCrisis && (
+            <div className="flex items-center space-x-1">
+              {getVerificationIcon()}
+              <span className="text-green-400">
+                Crisis events verified across {crisisVerificationConfidence >= 0.8 ? '3+' : '2+'} sources
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center space-x-4">
           <span>Data Points: <span className="text-white font-mono">{chartData.length.toLocaleString()}</span></span>

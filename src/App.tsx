@@ -26,6 +26,8 @@ function App() {
   const [companyMetrics, setCompanyMetrics] = useState<CompanyMetrics | null>(null);
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'24h' | '7d' | '30d' | '1y' | 'all'>('30d');
+  const [hasVerifiedCrisis, setHasVerifiedCrisis] = useState(false);
+  const [crisisVerificationConfidence, setCrisisVerificationConfidence] = useState(0);
 
   // Section collapse states
   const [sectionStates, setSectionStates] = useState({
@@ -60,45 +62,31 @@ function App() {
     // Calculate range-specific metrics
     const rangeMetrics = calculateRangeMetrics(filteredSentimentData, dateRange);
     
-    // FIXED: Properly calculate stakeholder confidence based on filtered data and timeframe
+    // Calculate stakeholder confidence based on filtered data and timeframe
     const calculateStakeholderConfidence = () => {
-      // Base confidence from original metrics
       const baseConfidence = companyMetrics.kpiMetrics.stakeholderConfidence;
-      
-      // Adjust based on sentiment trend in the selected timeframe
-      const sentimentImpact = rangeMetrics.sentimentTrend * 0.3; // 30% weight on sentiment trend
-      
-      // Adjust based on volume trend (higher volume = more stakeholder engagement)
-      const volumeImpact = rangeMetrics.volumeTrend * 0.1; // 10% weight on volume trend
-      
-      // Adjust based on timeframe (shorter timeframes show more recent confidence)
+      const sentimentImpact = rangeMetrics.sentimentTrend * 0.3;
+      const volumeImpact = rangeMetrics.volumeTrend * 0.1;
       const timeframeMultiplier = selectedTimeframe === '24h' ? 1.2 : 
                                   selectedTimeframe === '7d' ? 1.1 : 
                                   selectedTimeframe === '30d' ? 1.0 : 
                                   selectedTimeframe === '1y' ? 0.9 : 0.8;
       
-      // Calculate adjusted confidence
       let adjustedConfidence = baseConfidence + sentimentImpact + volumeImpact;
       adjustedConfidence = adjustedConfidence * timeframeMultiplier;
       
-      // Ensure it stays within valid range (0-100)
       return Math.max(0, Math.min(100, Math.round(adjustedConfidence)));
     };
 
-    // FIXED: Properly calculate media narrative momentum based on filtered data and timeframe
+    // Calculate media narrative momentum based on filtered data and timeframe
     const calculateMediaNarrativeMomentum = () => {
-      // Base momentum from original metrics
       const baseMomentum = companyMetrics.kpiMetrics.mediaMomentum;
+      const volumeWeight = rangeMetrics.totalVolume / 1000;
+      const sentimentWeight = Math.max(0, rangeMetrics.averageSentiment + 100) / 2;
+      const trendWeight = Math.max(0, rangeMetrics.sentimentTrend + 50);
       
-      // Calculate momentum based on volume and sentiment trends in the selected timeframe
-      const volumeWeight = rangeMetrics.totalVolume / 1000; // Scale volume to reasonable range
-      const sentimentWeight = Math.max(0, rangeMetrics.averageSentiment + 100) / 2; // Convert -100/+100 to 0-100 scale
-      const trendWeight = Math.max(0, rangeMetrics.sentimentTrend + 50); // Convert trend to positive scale
-      
-      // Combine factors with different weights
       let calculatedMomentum = (volumeWeight * 0.4) + (sentimentWeight * 0.4) + (trendWeight * 0.2);
       
-      // Apply timeframe multiplier (recent activity is more relevant for momentum)
       const timeframeMultiplier = selectedTimeframe === '24h' ? 1.5 : 
                                   selectedTimeframe === '7d' ? 1.3 : 
                                   selectedTimeframe === '30d' ? 1.0 : 
@@ -106,7 +94,6 @@ function App() {
       
       calculatedMomentum = calculatedMomentum * timeframeMultiplier;
       
-      // Ensure it stays within valid range (0-100)
       return Math.max(0, Math.min(100, Math.round(calculatedMomentum)));
     };
 
@@ -115,16 +102,16 @@ function App() {
       ...companyMetrics.kpiMetrics,
       overallSentiment: rangeMetrics.averageSentiment,
       recoveryVelocity: Math.max(0, Math.min(100, Math.round(companyMetrics.kpiMetrics.recoveryVelocity + rangeMetrics.sentimentTrend))),
-      stakeholderConfidence: calculateStakeholderConfidence(), // FIXED: Now properly calculated
+      stakeholderConfidence: calculateStakeholderConfidence(),
       competitiveAdvantage: Math.max(-100, Math.min(100, Math.round(companyMetrics.kpiMetrics.competitiveAdvantage + (rangeMetrics.sentimentTrend * 0.2)))),
-      mediaMomentum: calculateMediaNarrativeMomentum() // FIXED: Now properly calculated based on filtered data
+      mediaMomentum: calculateMediaNarrativeMomentum()
     };
 
     // Adjust platform metrics based on date range
     const adjustedPlatformMetrics = companyMetrics.platformMetrics.map(platform => ({
       ...platform,
-      volume: Math.round(platform.volume * (dateRange.totalDays / 365)), // Scale by time range
-      sentiment: Math.round(platform.sentiment + (rangeMetrics.sentimentTrend * 0.1)) // Slight adjustment based on trend
+      volume: Math.round(platform.volume * (dateRange.totalDays / 365)),
+      sentiment: Math.round(platform.sentiment + (rangeMetrics.sentimentTrend * 0.1))
     }));
 
     // Adjust stakeholder segments based on timeframe and sentiment trends
@@ -132,7 +119,6 @@ function App() {
       ...segment,
       volume: Math.round(segment.volume * (dateRange.totalDays / 365)),
       sentiment: Math.round(segment.sentiment + (rangeMetrics.sentimentTrend * 0.2)),
-      // Adjust trend based on timeframe
       trend: Math.round(segment.trend + (rangeMetrics.sentimentTrend * 0.15))
     }));
 
@@ -146,7 +132,7 @@ function App() {
     // Adjust competitor data
     const adjustedCompetitorData = companyMetrics.competitorData.map(competitor => ({
       ...competitor,
-      sentiment: Math.round(competitor.sentiment + (Math.random() - 0.5) * 10) // Add some variation
+      sentiment: Math.round(competitor.sentiment + (Math.random() - 0.5) * 10)
     }));
 
     return {
@@ -197,7 +183,9 @@ function App() {
     setCompanyMetrics(null);
     setNewsArticles([]);
     setIsLoading(false);
-    setSelectedTimeframe('30d'); // Reset to default timeframe
+    setSelectedTimeframe('30d');
+    setHasVerifiedCrisis(false);
+    setCrisisVerificationConfidence(0);
     
     // Activate agent swarm for new company
     loadCompanyMetrics(newCompanyName.trim(), true);
@@ -225,6 +213,13 @@ function App() {
     const collectedMetrics = agentSwarmService.getCollectedMetrics();
     const collectedNews = agentSwarmService.getCollectedNewsArticles();
     
+    // Check if crisis events were verified
+    const hasVerified = agentSwarmService.hasVerifiedCrisisEvents();
+    const verificationResult = agentSwarmService.getCrisisVerificationResult();
+    
+    setHasVerifiedCrisis(hasVerified);
+    setCrisisVerificationConfidence(verificationResult?.confidence || 0);
+    
     if (collectedMetrics) {
       // Use the metrics collected by the agent swarm
       setCompanyMetrics(collectedMetrics);
@@ -243,10 +238,8 @@ function App() {
     const allCrisisEvents = filteredMetrics?.crisisEvents || [];
     
     if (allCrisisEvents.length === 0) {
-      // Fallback calculation based on company name for consistency
-      const companySeed = companyName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const fallbackDays = 30 + (companySeed % 60); // Between 30-90 days
-      return { days: fallbackDays, allCrisisEvents: [] };
+      // No crisis events - return 0 days
+      return { days: 0, allCrisisEvents: [] };
     }
 
     // Find the most recent crisis event
@@ -255,10 +248,8 @@ function App() {
       .sort((a, b) => b.date.getTime() - a.date.getTime());
 
     if (crisisEvents.length === 0) {
-      // No crisis events found, use company-specific calculation
-      const companySeed = companyName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const fallbackDays = 30 + (companySeed % 60);
-      return { days: fallbackDays, allCrisisEvents };
+      // No crisis events found
+      return { days: 0, allCrisisEvents };
     }
 
     const lastCrisisEvent = crisisEvents[0];
@@ -301,6 +292,8 @@ function App() {
           crisisDays={0}
           lastUpdate={lastUpdate}
           allCrisisEvents={[]}
+          hasVerifiedCrisis={false}
+          crisisVerificationConfidence={0}
         />
         <AgentSwarmMonitor 
           companyName={companyName}
@@ -321,6 +314,8 @@ function App() {
           lastUpdate={lastUpdate}
           lastCrisisEvent={lastCrisisEvent}
           allCrisisEvents={allCrisisEvents}
+          hasVerifiedCrisis={hasVerifiedCrisis}
+          crisisVerificationConfidence={crisisVerificationConfidence}
         />
         
         <main className="p-6">
@@ -362,6 +357,8 @@ function App() {
           crisisDays={0}
           lastUpdate={lastUpdate}
           allCrisisEvents={[]}
+          hasVerifiedCrisis={false}
+          crisisVerificationConfidence={0}
         />
         
         <main className="p-6">
@@ -401,6 +398,8 @@ function App() {
         lastUpdate={lastUpdate}
         lastCrisisEvent={lastCrisisEvent}
         allCrisisEvents={allCrisisEvents}
+        hasVerifiedCrisis={hasVerifiedCrisis}
+        crisisVerificationConfidence={crisisVerificationConfidence}
       />
       
       <main className="p-6">
@@ -418,6 +417,12 @@ function App() {
               <div className="text-sm text-blue-400 font-medium">
                 {dataStatus.label}
               </div>
+              {hasVerifiedCrisis && (
+                <div className="flex items-center space-x-1 text-sm text-green-400">
+                  <span>•</span>
+                  <span>Crisis Events Verified ({(crisisVerificationConfidence * 100).toFixed(0)}% confidence)</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-6 text-sm text-slate-400">
               <span>Total Days: <span className="text-white font-mono">{dataStatus.totalDays}</span></span>
@@ -446,7 +451,7 @@ function App() {
         {/* Executive Sentiment Command Center Section */}
         <CollapsibleSection
           title="Executive Sentiment Command Center"
-          subtitle="Real-time sentiment analysis and trend monitoring"
+          subtitle="Real-time sentiment analysis and trend monitoring with verified crisis events"
           isExpanded={sectionStates.sentiment}
           onToggle={() => toggleSection('sentiment')}
           className="mb-8"
@@ -457,6 +462,8 @@ function App() {
             events={filteredMetrics.crisisEvents}
             companyName={companyName}
             onTimeframeChange={handleTimeframeChange}
+            hasVerifiedCrisis={hasVerifiedCrisis}
+            crisisVerificationConfidence={crisisVerificationConfidence}
           />
         </CollapsibleSection>
 
@@ -485,7 +492,7 @@ function App() {
           <div className="grid grid-cols-4 gap-6">
             <PlatformMatrix platforms={filteredMetrics.platformMetrics} companyName={companyName} />
             <StakeholderSegments segments={filteredMetrics.stakeholderSegments} companyName={companyName} />
-            <GeographicMap regions={filteredMetrics.geographicData} companyName={companyName} />
+            <GeographicMap regions={filteredMetrics.geographicData} companyName={companyName}  />
             <CompetitiveLandscape competitors={filteredMetrics.competitorData} companyName={companyName} />
           </div>
         </CollapsibleSection>
@@ -493,7 +500,7 @@ function App() {
         {/* Actionable Intelligence Center Section */}
         <CollapsibleSection
           title="Actionable Intelligence Center"
-          subtitle="Threats, opportunities, response tracking, and executive recommendations"
+          subtitle="Company-specific threats, opportunities, response tracking, and executive recommendations"
           isExpanded={sectionStates.actionable}
           onToggle={() => toggleSection('actionable')}
           className="mb-8"
@@ -564,7 +571,7 @@ function App() {
       <footer className="bg-slate-800 border-t border-slate-700 px-6 py-4 mt-8">
         <div className="flex items-center justify-between text-sm text-slate-400">
           <div>
-            S3IP v2.1.0 | Enterprise Crisis Recovery Platform | SOC 2 Type II Compliant
+            S3IP v2.1.0 | Enterprise Crisis Recovery Platform | SOC 2 Type II Compliant | Multi-Source Verification
           </div>
           <div>
             Company: <span className="text-blue-400 font-medium">{companyName}</span> | 
@@ -579,6 +586,14 @@ function App() {
               {filteredMetrics.validation.isValid ? 
                 (87.2 + (companyName.length % 10)).toFixed(1) : '0.0'}%
             </span>
+            {hasVerifiedCrisis && (
+              <>
+                {' | '}
+                <span className="text-green-400">
+                  Crisis Verified: {(crisisVerificationConfidence * 100).toFixed(0)}%
+                </span>
+              </>
+            )}
           </div>
         </div>
       </footer>

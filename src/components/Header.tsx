@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, Settings, Bell, User, Info } from 'lucide-react';
+import { Building2, Settings, Bell, User, Info, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import { CrisisModal } from './CrisisModal';
 
 interface HeaderProps {
@@ -21,6 +21,8 @@ interface HeaderProps {
     impact: number;
     description: string;
   }>;
+  hasVerifiedCrisis?: boolean;
+  crisisVerificationConfidence?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -29,7 +31,9 @@ export const Header: React.FC<HeaderProps> = ({
   crisisDays, 
   lastUpdate,
   lastCrisisEvent,
-  allCrisisEvents = []
+  allCrisisEvents = [],
+  hasVerifiedCrisis = false,
+  crisisVerificationConfidence = 0
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempName, setTempName] = useState(companyName);
@@ -72,9 +76,23 @@ export const Header: React.FC<HeaderProps> = ({
     return 'Post-Crisis';
   };
 
+  const getVerificationIcon = () => {
+    if (!hasVerifiedCrisis) return null;
+    
+    if (crisisVerificationConfidence >= 0.8) {
+      return <CheckCircle className="h-3 w-3 text-green-400" title="High confidence verification" />;
+    } else if (crisisVerificationConfidence >= 0.7) {
+      return <Shield className="h-3 w-3 text-yellow-400" title="Medium confidence verification" />;
+    } else {
+      return <AlertTriangle className="h-3 w-3 text-orange-400" title="Low confidence verification" />;
+    }
+  };
+
   const handleCrisisDayClick = () => {
-    setShowCrisisModal(true);
-    setShowCrisisTooltip(false);
+    if (hasVerifiedCrisis) {
+      setShowCrisisModal(true);
+      setShowCrisisTooltip(false);
+    }
   };
 
   return (
@@ -89,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
                   STRATEGIC SOCIAL SENTIMENT INTELLIGENCE PLATFORM
                 </h1>
                 <div className="text-xs text-slate-400 mt-1">
-                  Enterprise Crisis Recovery | Real-Time Analytics | Data Since Jan 1, 2024
+                  Enterprise Crisis Recovery | Real-Time Analytics | Multi-Source Verification
                 </div>
               </div>
             </div>
@@ -136,86 +154,104 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            <div className="text-sm text-slate-300">
-              <div className="flex items-center space-x-2">
-                <span>Crisis Timeline:</span>
-                <div 
-                  className="relative"
-                  onMouseEnter={() => setShowCrisisTooltip(true)}
-                  onMouseLeave={() => setShowCrisisTooltip(false)}
-                >
-                  <button
-                    onClick={handleCrisisDayClick}
-                    className="flex items-center space-x-1 cursor-pointer hover:bg-slate-800 px-2 py-1 rounded transition-colors"
-                    title="Click for detailed crisis timeline"
+            {/* Crisis Timeline - Only show if verified crisis events exist */}
+            {hasVerifiedCrisis && (
+              <div className="text-sm text-slate-300">
+                <div className="flex items-center space-x-2">
+                  <span>Crisis Timeline:</span>
+                  <div 
+                    className="relative"
+                    onMouseEnter={() => setShowCrisisTooltip(true)}
+                    onMouseLeave={() => setShowCrisisTooltip(false)}
                   >
-                    <span className={`font-medium ${getCrisisStatusColor(crisisDays)}`}>
-                      Day +{crisisDays}
-                    </span>
-                    <span className="text-slate-400 text-xs">
-                      ({getCrisisPhase(crisisDays)})
-                    </span>
-                    <Info className="h-3 w-3 text-slate-400" />
-                  </button>
-                  
-                  {/* Crisis Details Tooltip */}
-                  {showCrisisTooltip && lastCrisisEvent && (
-                    <div className="absolute top-full right-0 mt-2 w-80 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 p-4">
-                      <div className="text-xs text-slate-400 mb-1">Last Crisis Event</div>
-                      <div className="text-sm font-medium text-white mb-2">
-                        {lastCrisisEvent.title}
+                    <button
+                      onClick={handleCrisisDayClick}
+                      className="flex items-center space-x-1 cursor-pointer hover:bg-slate-800 px-2 py-1 rounded transition-colors"
+                      title="Click for detailed crisis timeline"
+                    >
+                      <span className={`font-medium ${getCrisisStatusColor(crisisDays)}`}>
+                        Day +{crisisDays}
+                      </span>
+                      <span className="text-slate-400 text-xs">
+                        ({getCrisisPhase(crisisDays)})
+                      </span>
+                      {getVerificationIcon()}
+                      <Info className="h-3 w-3 text-slate-400" />
+                    </button>
+                    
+                    {/* Crisis Details Tooltip */}
+                    {showCrisisTooltip && lastCrisisEvent && (
+                      <div className="absolute top-full right-0 mt-2 w-80 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 p-4">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <div className="text-xs text-slate-400">Verified Crisis Event</div>
+                          {getVerificationIcon()}
+                          <div className="text-xs text-green-400">
+                            {(crisisVerificationConfidence * 100).toFixed(0)}% confidence
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-white mb-2">
+                          {lastCrisisEvent.title}
+                        </div>
+                        <div className="text-xs text-slate-300 mb-2">
+                          {lastCrisisEvent.description}
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="text-slate-400">
+                            {formatCrisisDate(lastCrisisEvent.date)}
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <span className={`px-2 py-1 rounded ${
+                              lastCrisisEvent.type === 'crisis' ? 'bg-red-500/20 text-red-400' :
+                              lastCrisisEvent.type === 'response' ? 'bg-blue-500/20 text-blue-400' :
+                              lastCrisisEvent.type === 'announcement' ? 'bg-green-500/20 text-green-400' :
+                              'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {lastCrisisEvent.type}
+                            </span>
+                            <span className={`font-mono ${
+                              lastCrisisEvent.impact > 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {lastCrisisEvent.impact > 0 ? '+' : ''}{lastCrisisEvent.impact}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Timeline Progress Bar */}
+                        <div className="mt-3 pt-3 border-t border-slate-700">
+                          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                            <span>Recovery Progress</span>
+                            <span>{Math.min(100, Math.round((crisisDays / 90) * 100))}%</span>
+                          </div>
+                          <div className="bg-slate-700 rounded-full h-1.5">
+                            <div
+                              className={`h-1.5 rounded-full transition-all duration-300 ${
+                                crisisDays < 30 ? 'bg-red-400' :
+                                crisisDays < 60 ? 'bg-orange-400' :
+                                crisisDays < 90 ? 'bg-yellow-400' :
+                                'bg-green-400'
+                              }`}
+                              style={{ width: `${Math.min(100, (crisisDays / 90) * 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1 text-center">
+                            Click for detailed verified timeline
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-300 mb-2">
-                        {lastCrisisEvent.description}
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="text-slate-400">
-                          {formatCrisisDate(lastCrisisEvent.date)}
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <span className={`px-2 py-1 rounded ${
-                            lastCrisisEvent.type === 'crisis' ? 'bg-red-500/20 text-red-400' :
-                            lastCrisisEvent.type === 'response' ? 'bg-blue-500/20 text-blue-400' :
-                            lastCrisisEvent.type === 'announcement' ? 'bg-green-500/20 text-green-400' :
-                            'bg-yellow-500/20 text-yellow-400'
-                          }`}>
-                            {lastCrisisEvent.type}
-                          </span>
-                          <span className={`font-mono ${
-                            lastCrisisEvent.impact > 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                            {lastCrisisEvent.impact > 0 ? '+' : ''}{lastCrisisEvent.impact}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Timeline Progress Bar */}
-                      <div className="mt-3 pt-3 border-t border-slate-700">
-                        <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                          <span>Recovery Progress</span>
-                          <span>{Math.min(100, Math.round((crisisDays / 90) * 100))}%</span>
-                        </div>
-                        <div className="bg-slate-700 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full transition-all duration-300 ${
-                              crisisDays < 30 ? 'bg-red-400' :
-                              crisisDays < 60 ? 'bg-orange-400' :
-                              crisisDays < 90 ? 'bg-yellow-400' :
-                              'bg-green-400'
-                            }`}
-                            style={{ width: `${Math.min(100, (crisisDays / 90) * 100)}%` }}
-                          />
-                        </div>
-                        <div className="text-xs text-slate-500 mt-1 text-center">
-                          Click for detailed timeline
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
+                <div>Last Updated: <span className="text-green-400 font-mono">{currentTime} EST</span></div>
               </div>
-              <div>Last Updated: <span className="text-green-400 font-mono">{currentTime} EST</span></div>
-            </div>
+            )}
+
+            {/* Show last update if no crisis timeline */}
+            {!hasVerifiedCrisis && (
+              <div className="text-sm text-slate-300">
+                <div>Last Updated: <span className="text-green-400 font-mono">{currentTime} EST</span></div>
+                <div className="text-xs text-slate-500">No verified crisis events found</div>
+              </div>
+            )}
 
             <div className="flex items-center space-x-4">
               <button className="p-2 text-slate-400 hover:text-white transition-colors relative rounded hover:bg-slate-700">
@@ -235,15 +271,17 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
-      {/* Crisis Modal */}
-      <CrisisModal
-        isOpen={showCrisisModal}
-        onClose={() => setShowCrisisModal(false)}
-        companyName={companyName}
-        crisisDays={crisisDays}
-        lastCrisisEvent={lastCrisisEvent}
-        allCrisisEvents={allCrisisEvents}
-      />
+      {/* Crisis Modal - Only show if verified crisis events exist */}
+      {hasVerifiedCrisis && (
+        <CrisisModal
+          isOpen={showCrisisModal}
+          onClose={() => setShowCrisisModal(false)}
+          companyName={companyName}
+          crisisDays={crisisDays}
+          lastCrisisEvent={lastCrisisEvent}
+          allCrisisEvents={allCrisisEvents}
+        />
+      )}
     </>
   );
 };

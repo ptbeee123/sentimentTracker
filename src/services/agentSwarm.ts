@@ -4,6 +4,8 @@ import { realDataCollectionService, RedditPost, NewsArticle, TwitterMention, Sto
 import { verifiedNewsService, VerifiedNewsArticle } from './verifiedNewsService';
 import { validatorAgent } from './validatorAgent';
 import { crisisValidationService, ValidatedCrisisEvent } from './crisisValidationService';
+import { crisisVerificationService, CrisisVerificationResult } from './crisisVerificationService';
+import { linkedinAgent, LinkedInPost, LinkedInCompanyUpdate, LinkedInExecutiveMention } from './linkedinAgent';
 
 export class AgentSwarmService {
   private swarm: AgentSwarm | null = null;
@@ -19,6 +21,12 @@ export class AgentSwarmService {
     geographicMentions: GeographicMention[];
     threatsOpportunities: ThreatOpportunityData[];
     validatedCrisisEvents: ValidatedCrisisEvent[];
+    crisisVerification: CrisisVerificationResult | null;
+    linkedinData: {
+      posts: LinkedInPost[];
+      companyUpdates: LinkedInCompanyUpdate[];
+      executiveMentions: LinkedInExecutiveMention[];
+    };
   } = {
     redditPosts: [],
     newsArticles: [],
@@ -28,11 +36,21 @@ export class AgentSwarmService {
     competitorMentions: [],
     geographicMentions: [],
     threatsOpportunities: [],
-    validatedCrisisEvents: []
+    validatedCrisisEvents: [],
+    crisisVerification: null,
+    linkedinData: {
+      posts: [],
+      companyUpdates: [],
+      executiveMentions: []
+    }
   };
 
   constructor() {
     realDataCollectionService.setUpdateCallback((update) => {
+      this.handleRealDataUpdate(update);
+    });
+
+    linkedinAgent.setUpdateCallback((update) => {
       this.handleRealDataUpdate(update);
     });
   }
@@ -48,7 +66,9 @@ export class AgentSwarmService {
       'competitor-collector': 'competitor',
       'geographic-collector': 'geographic',
       'threat-collector': 'threat',
-      'crisis-validator': 'crisis'
+      'crisis-validator': 'crisis',
+      'crisis-verifier': 'crisis',
+      'linkedin-collector': 'platform'
     };
 
     const agent = this.swarm.agents.find(a => a.type === agentMap[update.agent]);
@@ -58,7 +78,6 @@ export class AgentSwarmService {
       
       if (update.status === 'collecting') {
         agent.status = 'collecting';
-        // Update progress incrementally during collection
         agent.progress = Math.min(90, agent.progress + 10 + Math.random() * 20);
         
         if (update.dataPoints) {
@@ -71,12 +90,10 @@ export class AgentSwarmService {
         agent.progress = 100;
         
         if (update.dataPoints) {
-          // Set final data points count
           const finalDataPoints = update.dataPoints;
           const previousDataPoints = agent.dataPoints;
           agent.dataPoints = finalDataPoints;
           
-          // Update total, accounting for any previous counts
           this.swarm.totalDataPoints = this.swarm.totalDataPoints - previousDataPoints + finalDataPoints;
         }
       } else if (update.status === 'error') {
@@ -133,6 +150,16 @@ export class AgentSwarmService {
         id: 'verified-news-collector',
         name: 'Verified News Sources Agent',
         type: 'threat',
+        status: 'idle',
+        progress: 0,
+        lastUpdate: new Date(),
+        dataPoints: 0,
+        errors: []
+      },
+      {
+        id: 'linkedin-collector',
+        name: 'LinkedIn Professional Network Agent',
+        type: 'platform',
         status: 'idle',
         progress: 0,
         lastUpdate: new Date(),
@@ -198,6 +225,16 @@ export class AgentSwarmService {
         lastUpdate: new Date(),
         dataPoints: 0,
         errors: []
+      },
+      {
+        id: 'crisis-verifier',
+        name: 'Multi-Source Crisis Verification Agent',
+        type: 'crisis',
+        status: 'idle',
+        progress: 0,
+        lastUpdate: new Date(),
+        dataPoints: 0,
+        errors: []
       }
     ];
 
@@ -209,7 +246,7 @@ export class AgentSwarmService {
       overallProgress: 0,
       status: 'initializing',
       totalDataPoints: 0,
-      estimatedCompletion: new Date(Date.now() + 90000) // 90 seconds for real collection
+      estimatedCompletion: new Date(Date.now() + 120000) // 2 minutes for verification
     };
 
     // Reset collected data
@@ -223,7 +260,13 @@ export class AgentSwarmService {
       competitorMentions: [],
       geographicMentions: [],
       threatsOpportunities: [],
-      validatedCrisisEvents: []
+      validatedCrisisEvents: [],
+      crisisVerification: null,
+      linkedinData: {
+        posts: [],
+        companyUpdates: [],
+        executiveMentions: []
+      }
     };
 
     this.notifySubscribers();
@@ -244,12 +287,14 @@ export class AgentSwarmService {
         this.collectRealRedditData(),
         this.collectRealNewsData(),
         this.collectVerifiedNewsData(),
+        this.collectLinkedInData(), // NEW: LinkedIn data collection
         this.collectRealFinancialData(),
         this.collectRealCompetitorData(),
         this.collectRealGeographicData(),
         this.runValidatorAgent(),
         this.collectRealStakeholderData(),
-        this.validateCrisisEvents() // NEW: Crisis validation
+        this.validateCrisisEvents(),
+        this.verifyCrisisEvents() // NEW: Multi-source crisis verification
       ];
       
       await Promise.all(collectionPromises);
@@ -267,6 +312,88 @@ export class AgentSwarmService {
     }
 
     this.notifySubscribers();
+  }
+
+  // NEW: LinkedIn data collection
+  private async collectLinkedInData(): Promise<void> {
+    if (!this.swarm) return;
+
+    const agent = this.swarm.agents.find(a => a.id === 'linkedin-collector');
+    if (!agent) return;
+
+    agent.status = 'collecting';
+    agent.progress = 10;
+    this.notifySubscribers();
+
+    try {
+      const linkedinData = await linkedinAgent.collectLinkedInData(this.swarm.companyName);
+      
+      this.collectedData.linkedinData = linkedinData;
+      
+      const totalDataPoints = linkedinData.posts.length + 
+                             linkedinData.companyUpdates.length + 
+                             linkedinData.executiveMentions.reduce((sum, exec) => sum + exec.mentions.length, 0);
+      
+      this.handleRealDataUpdate({
+        agent: 'linkedin-collector',
+        status: 'completed',
+        message: `Successfully collected ${totalDataPoints} LinkedIn data points`,
+        dataPoints: totalDataPoints
+      });
+      
+    } catch (error) {
+      this.handleRealDataUpdate({
+        agent: 'linkedin-collector',
+        status: 'error',
+        message: `LinkedIn collection failed: ${error}`
+      });
+    }
+  }
+
+  // NEW: Multi-source crisis verification
+  private async verifyCrisisEvents(): Promise<void> {
+    if (!this.swarm) return;
+
+    const agent = this.swarm.agents.find(a => a.id === 'crisis-verifier');
+    if (!agent) return;
+
+    agent.status = 'collecting';
+    agent.progress = 10;
+    this.notifySubscribers();
+
+    try {
+      this.handleRealDataUpdate({
+        agent: 'crisis-verifier',
+        status: 'collecting',
+        message: `Cross-verifying crisis events for "${this.swarm.companyName}" across multiple sources...`
+      });
+
+      // Perform multi-source verification
+      const verificationResult = await crisisVerificationService.verifyCrisisEvents(this.swarm.companyName);
+      
+      this.collectedData.crisisVerification = verificationResult;
+      
+      // Only keep verified events
+      if (verificationResult.isVerified) {
+        this.collectedData.validatedCrisisEvents = verificationResult.verifiedEvents;
+      } else {
+        this.collectedData.validatedCrisisEvents = [];
+      }
+      
+      this.handleRealDataUpdate({
+        agent: 'crisis-verifier',
+        status: 'completed',
+        message: `Verified ${verificationResult.verifiedEvents.length} crisis events across ${verificationResult.verificationSummary.verifiedSources} sources (${(verificationResult.confidence * 100).toFixed(1)}% confidence)`,
+        dataPoints: verificationResult.verifiedEvents.length
+      });
+      
+    } catch (error) {
+      this.handleRealDataUpdate({
+        agent: 'crisis-verifier',
+        status: 'error',
+        message: `Crisis verification failed: ${error}`
+      });
+    }
   }
 
   private async validateCrisisEvents(): Promise<void> {
@@ -289,7 +416,10 @@ export class AgentSwarmService {
       // Validate crisis events using real data sources
       const validationResult = await crisisValidationService.validateCompanyCrises(this.swarm.companyName);
       
-      this.collectedData.validatedCrisisEvents = validationResult.verifiedEvents;
+      // Store initial validation results (will be further verified by crisis-verifier)
+      if (!this.collectedData.validatedCrisisEvents.length) {
+        this.collectedData.validatedCrisisEvents = validationResult.verifiedEvents;
+      }
       
       this.handleRealDataUpdate({
         agent: 'crisis-validator',
@@ -568,14 +698,14 @@ export class AgentSwarmService {
   private async generateRealDataMetrics(): Promise<void> {
     if (!this.swarm) return;
 
-    // Generate sentiment data from real sources
+    // Generate sentiment data from real sources including LinkedIn
     const sentimentData = this.generateSentimentFromRealData();
     const hourlyData = this.generateHourlyFromRealData();
     
     // Generate KPIs based on real data
     const kpiMetrics = this.generateKPIsFromRealData();
     
-    // Generate platform metrics from real data
+    // Generate platform metrics from real data including LinkedIn
     const platformMetrics = this.generatePlatformMetricsFromRealData();
     
     // Generate stakeholder segments from real data
@@ -587,8 +717,8 @@ export class AgentSwarmService {
     // Generate competitor data from real sources
     const competitorData = this.generateCompetitorFromRealData();
     
-    // UPDATED: Use validated crisis events from crisis validation service
-    const crisisEvents = this.generateCrisisEventsFromValidatedData();
+    // UPDATED: Use verified crisis events only if verification passed
+    const crisisEvents = this.generateCrisisEventsFromVerifiedData();
     
     // Use validated threats/opportunities from validator agent
     const threatsOpportunities = this.convertValidatedThreatsOpportunities();
@@ -607,20 +737,25 @@ export class AgentSwarmService {
     };
   }
 
-  // NEW: Generate crisis events from validated data
-  private generateCrisisEventsFromValidatedData(): CrisisEvent[] {
+  // UPDATED: Only generate crisis events if verification passed
+  private generateCrisisEventsFromVerifiedData(): CrisisEvent[] {
     const events: CrisisEvent[] = [];
     
-    // Convert validated crisis events to dashboard format
-    this.collectedData.validatedCrisisEvents.forEach(validatedEvent => {
-      events.push({
-        date: validatedEvent.date,
-        title: validatedEvent.title,
-        type: validatedEvent.type,
-        impact: validatedEvent.impact,
-        description: validatedEvent.description
+    // Only use crisis events if they passed verification
+    if (this.collectedData.crisisVerification?.isVerified && 
+        this.collectedData.crisisVerification.confidence >= 0.7) {
+      
+      // Convert verified crisis events to dashboard format
+      this.collectedData.validatedCrisisEvents.forEach(validatedEvent => {
+        events.push({
+          date: validatedEvent.date,
+          title: validatedEvent.title,
+          type: validatedEvent.type,
+          impact: validatedEvent.impact,
+          description: validatedEvent.description
+        });
       });
-    });
+    }
 
     // Sort by date (oldest first for timeline)
     return events.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -679,7 +814,7 @@ export class AgentSwarmService {
     const today = new Date();
     const daysDiff = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Calculate base sentiment from real data
+    // Calculate base sentiment from real data including LinkedIn
     let baseSentiment = 0;
     let totalMentions = 0;
 
@@ -688,14 +823,14 @@ export class AgentSwarmService {
       const redditSentiment = this.collectedData.redditPosts.reduce((sum, post) => {
         return sum + Math.max(-100, Math.min(100, (post.score - 10) * 2));
       }, 0) / this.collectedData.redditPosts.length;
-      baseSentiment += redditSentiment * 0.3;
+      baseSentiment += redditSentiment * 0.25;
       totalMentions += this.collectedData.redditPosts.length;
     }
 
     // Factor in news sentiment
     if (this.collectedData.newsArticles.length > 0) {
       const newsSentiment = this.analyzeNewsSentiment();
-      baseSentiment += newsSentiment * 0.4;
+      baseSentiment += newsSentiment * 0.3;
       totalMentions += this.collectedData.newsArticles.length;
     }
 
@@ -704,14 +839,22 @@ export class AgentSwarmService {
       const verifiedSentiment = this.collectedData.verifiedNewsArticles.reduce((sum, article) => {
         return sum + (article.category === 'threat' ? article.impact : Math.abs(article.impact));
       }, 0) / this.collectedData.verifiedNewsArticles.length;
-      baseSentiment += verifiedSentiment * 0.3;
+      baseSentiment += verifiedSentiment * 0.25;
       totalMentions += this.collectedData.verifiedNewsArticles.length;
+    }
+
+    // NEW: Factor in LinkedIn sentiment
+    if (this.collectedData.linkedinData.posts.length > 0) {
+      const linkedinSentiment = linkedinAgent.calculateLinkedInSentiment(this.collectedData.linkedinData);
+      baseSentiment += linkedinSentiment * 0.2;
+      totalMentions += this.collectedData.linkedinData.posts.length + 
+                      this.collectedData.linkedinData.companyUpdates.length;
     }
 
     // Factor in financial data
     if (this.collectedData.stockData.length > 0) {
       const stockSentiment = this.collectedData.stockData[this.collectedData.stockData.length - 1].changePercent * 10;
-      baseSentiment += Math.max(-50, Math.min(50, stockSentiment)) * 0.3;
+      baseSentiment += Math.max(-50, Math.min(50, stockSentiment)) * 0.2;
     }
 
     // Generate time series data
@@ -736,10 +879,16 @@ export class AgentSwarmService {
     const data: SentimentData[] = [];
     const now = new Date();
 
-    // Calculate current sentiment from real data
+    // Calculate current sentiment from real data including LinkedIn
     let currentSentiment = 0;
     if (this.collectedData.newsArticles.length > 0) {
       currentSentiment = this.analyzeNewsSentiment();
+    }
+    
+    // Add LinkedIn sentiment influence
+    if (this.collectedData.linkedinData.posts.length > 0) {
+      const linkedinSentiment = linkedinAgent.calculateLinkedInSentiment(this.collectedData.linkedinData);
+      currentSentiment = (currentSentiment + linkedinSentiment) / 2;
     }
 
     for (let i = 24; i >= 0; i--) {
@@ -766,10 +915,19 @@ export class AgentSwarmService {
     let competitiveAdvantage = 0;
     let mediaMomentum = 50;
 
-    // Calculate from real data
+    // Calculate from real data including LinkedIn
     if (this.collectedData.newsArticles.length > 0) {
       overallSentiment = Math.round(this.analyzeNewsSentiment());
       mediaMomentum = Math.round(Math.min(100, this.collectedData.newsArticles.length * 10));
+    }
+
+    // Add LinkedIn influence to KPIs
+    if (this.collectedData.linkedinData.posts.length > 0) {
+      const linkedinSentiment = linkedinAgent.calculateLinkedInSentiment(this.collectedData.linkedinData);
+      overallSentiment = Math.round((overallSentiment + linkedinSentiment) / 2);
+      
+      // LinkedIn professional network adds to stakeholder confidence
+      stakeholderConfidence += Math.round(this.collectedData.linkedinData.posts.length * 2);
     }
 
     if (this.collectedData.stockData.length > 0) {
@@ -812,6 +970,22 @@ export class AgentSwarmService {
       });
     }
 
+    // LinkedIn platform data
+    if (this.collectedData.linkedinData.posts.length > 0) {
+      const linkedinSentiment = Math.round(linkedinAgent.calculateLinkedInSentiment(this.collectedData.linkedinData));
+      const totalEngagement = this.collectedData.linkedinData.posts.reduce((sum, post) => 
+        sum + post.engagement.likes + post.engagement.comments + post.engagement.shares, 0);
+
+      platforms.push({
+        platform: 'LinkedIn',
+        sentiment: linkedinSentiment,
+        volume: this.collectedData.linkedinData.posts.length + this.collectedData.linkedinData.companyUpdates.length,
+        engagement: Math.round(totalEngagement / this.collectedData.linkedinData.posts.length),
+        reach: this.collectedData.linkedinData.posts.reduce((sum, post) => sum + post.author.followers, 0),
+        confidence: 0.92
+      });
+    }
+
     // News Media platform data
     if (this.collectedData.newsArticles.length > 0) {
       platforms.push({
@@ -849,14 +1023,6 @@ export class AgentSwarmService {
         engagement: Math.round(2 + Math.random() * 4),
         reach: Math.floor(500000 + Math.random() * 1000000),
         confidence: 0.75
-      },
-      {
-        platform: 'LinkedIn',
-        sentiment: Math.round(-5 + Math.random() * 25),
-        volume: Math.floor(1000 + Math.random() * 3000),
-        engagement: Math.round(5 + Math.random() * 8),
-        reach: Math.floor(200000 + Math.random() * 500000),
-        confidence: 0.8
       }
     );
 
@@ -896,6 +1062,13 @@ export class AgentSwarmService {
         priority: 'high' as const
       }
     ];
+
+    // Add LinkedIn professional sentiment to employees and partners
+    if (this.collectedData.linkedinData.posts.length > 0) {
+      const linkedinSentiment = linkedinAgent.calculateLinkedInSentiment(this.collectedData.linkedinData);
+      segments[2].sentiment = Math.round((segments[2].sentiment + linkedinSentiment) / 2); // Employees
+      segments[2].volume += this.collectedData.linkedinData.posts.length;
+    }
 
     return segments;
   }
@@ -1003,7 +1176,7 @@ export class AgentSwarmService {
     this.swarm.totalDataPoints = this.swarm.agents.reduce((sum, agent) => sum + agent.dataPoints, 0);
     
     const remainingProgress = 100 - this.swarm.overallProgress;
-    const estimatedSeconds = (remainingProgress / 100) * 90;
+    const estimatedSeconds = (remainingProgress / 100) * 120;
     this.swarm.estimatedCompletion = new Date(Date.now() + estimatedSeconds * 1000);
   }
 
@@ -1031,6 +1204,25 @@ export class AgentSwarmService {
     return this.collectedData.validatedCrisisEvents;
   }
 
+  public getCrisisVerificationResult(): CrisisVerificationResult | null {
+    return this.collectedData.crisisVerification;
+  }
+
+  public getLinkedInData(): {
+    posts: LinkedInPost[];
+    companyUpdates: LinkedInCompanyUpdate[];
+    executiveMentions: LinkedInExecutiveMention[];
+  } {
+    return this.collectedData.linkedinData;
+  }
+
+  // NEW: Check if verified crisis events exist
+  public hasVerifiedCrisisEvents(): boolean {
+    return this.collectedData.crisisVerification?.isVerified === true &&
+           this.collectedData.crisisVerification.confidence >= 0.7 &&
+           this.collectedData.validatedCrisisEvents.length > 0;
+  }
+
   public async getCollectionMetrics(): Promise<CollectionMetrics | null> {
     if (!this.swarm || this.swarm.status !== 'completed') {
       return null;
@@ -1047,9 +1239,10 @@ export class AgentSwarmService {
         'Reddit': this.collectedData.redditPosts.length,
         'Google News': this.collectedData.newsArticles.length,
         'Verified News': this.collectedData.verifiedNewsArticles.length,
+        'LinkedIn': this.collectedData.linkedinData.posts.length + this.collectedData.linkedinData.companyUpdates.length,
         'Financial APIs': this.collectedData.stockData.length,
         'Crisis Events': this.collectedData.validatedCrisisEvents.length,
-        'Other': Math.floor(this.swarm.totalDataPoints * 0.2)
+        'Other': Math.floor(this.swarm.totalDataPoints * 0.15)
       },
       geographicDistribution: {
         'North America': Math.floor(this.swarm.totalDataPoints * 0.45),
@@ -1057,7 +1250,7 @@ export class AgentSwarmService {
         'Asia Pacific': Math.floor(this.swarm.totalDataPoints * 0.20),
         'Other': Math.floor(this.swarm.totalDataPoints * 0.10)
       },
-      confidenceScore: 0.92 + Math.random() * 0.06,
+      confidenceScore: this.collectedData.crisisVerification?.confidence || 0.92 + Math.random() * 0.06,
       dataQuality: 0.95 + Math.random() * 0.04
     };
   }
