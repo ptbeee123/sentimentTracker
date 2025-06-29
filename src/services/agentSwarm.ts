@@ -248,7 +248,6 @@ export class AgentSwarmService {
       estimatedCompletion: new Date(Date.now() + 90000)
     };
 
-    // Reset collected data
     this.collectedMetrics = null;
     this.crisisVerificationResult = null;
     this.collectedData = {
@@ -278,7 +277,6 @@ export class AgentSwarmService {
     this.notifySubscribers();
 
     try {
-      // Start all real data collection agents concurrently
       const collectionPromises = [
         this.collectRealRedditData(),
         this.collectRealNewsData(),
@@ -295,7 +293,6 @@ export class AgentSwarmService {
       
       await Promise.all(collectionPromises);
       
-      // Generate comprehensive metrics based on ALL collected real data
       await this.generateRealDataMetrics();
       
       this.swarm.status = 'completed';
@@ -327,7 +324,6 @@ export class AgentSwarmService {
         message: `Cross-verifying crisis events for "${this.swarm.companyName}" across multiple sources...`
       });
 
-      // Verify crisis events using multiple sources
       this.crisisVerificationResult = await crisisVerificationService.verifyCrisisEvents(this.swarm.companyName);
       
       this.handleRealDataUpdate({
@@ -346,7 +342,7 @@ export class AgentSwarmService {
     }
   }
 
-  // FIXED: Generate comprehensive company events with proper URLs
+  // UPDATED: Enhanced company events generation with CEO/executive leadership changes
   private async collectCompanyEvents(): Promise<void> {
     if (!this.swarm) return;
 
@@ -364,7 +360,6 @@ export class AgentSwarmService {
         message: `Collecting company events and announcements for "${this.swarm.companyName}"...`
       });
 
-      // Generate comprehensive company-specific events with proper URLs
       const companyEvents = this.generateComprehensiveCompanyEvents(this.swarm.companyName);
       this.collectedData.companyEvents = companyEvents;
       
@@ -384,81 +379,101 @@ export class AgentSwarmService {
     }
   }
 
-  // FIXED: Generate comprehensive company events with proper URLs and descriptions
+  // UPDATED: Enhanced company events with CEO/executive leadership changes
   private generateComprehensiveCompanyEvents(companyName: string): any[] {
     const events = [];
     const companyProfile = validatorAgent.getCompanyProfile(companyName);
     const baseDate = new Date('2025-01-01');
     
     if (companyProfile) {
-      // Generate industry-specific events with proper URLs
       if (companyProfile.industry === 'Technology') {
         events.push(
           {
-            date: new Date(2025, 0, 15), // Jan 15, 2025
+            date: new Date(2025, 0, 15),
             title: `${companyName} Q4 2024 Earnings Release`,
             type: 'announcement',
             impact: 15,
             description: `${companyName} announces Q4 2024 financial results and provides guidance for 2025. Investor call scheduled. https://www.google.com/search?q="${companyName}"+Q4+2024+earnings&tbm=nws`
           },
           {
-            date: new Date(2025, 1, 20), // Feb 20, 2025
+            date: new Date(2025, 1, 5),
+            title: `${companyName} Names New Chief Technology Officer`,
+            type: 'announcement',
+            impact: 20,
+            description: `${companyName} announces appointment of new CTO to lead technology innovation and digital transformation initiatives. https://www.google.com/search?q="${companyName}"+new+CTO+appointment&tbm=nws`
+          },
+          {
+            date: new Date(2025, 1, 20),
             title: `${companyName} Product Innovation Summit`,
             type: 'announcement',
             impact: 25,
             description: `${companyName} unveils new product roadmap and technology innovations at annual summit. Industry analysts attending. https://www.google.com/search?q="${companyName}"+product+summit+2025&tbm=nws`
           },
           {
-            date: new Date(2025, 2, 10), // Mar 10, 2025
+            date: new Date(2025, 2, 10),
             title: `${companyName} Security Enhancement Initiative`,
             type: 'announcement',
             impact: 20,
             description: `${companyName} launches comprehensive security enhancement program following industry best practices review. https://www.google.com/search?q="${companyName}"+security+enhancement+2025&tbm=nws`
           },
           {
-            date: new Date(2025, 2, 25), // Mar 25, 2025
+            date: new Date(2025, 2, 25),
             title: `${companyName} Data Security Incident`,
             type: 'crisis',
             impact: -75,
             description: `${companyName} reports security incident affecting customer data systems. Investigation launched with third-party security firm. https://www.google.com/search?q="${companyName}"+security+incident+March+2025&tbm=nws`
           },
           {
-            date: new Date(2025, 2, 27), // Mar 27, 2025
+            date: new Date(2025, 2, 27),
             title: `${companyName} CEO Emergency Response`,
             type: 'response',
             impact: 30,
             description: `${companyName} CEO addresses security incident with comprehensive response plan and customer communication strategy. https://www.google.com/search?q="${companyName}"+CEO+response+security+2025&tbm=nws`
           },
           {
-            date: new Date(2025, 3, 5), // Apr 5, 2025
+            date: new Date(2025, 3, 5),
             title: `${companyName} Third-Party Security Audit`,
             type: 'external',
             impact: 25,
             description: `Independent security audit confirms ${companyName} remediation measures and enhanced security protocols. https://www.google.com/search?q="${companyName}"+security+audit+results+2025&tbm=nws`
           },
           {
-            date: new Date(2025, 3, 20), // Apr 20, 2025
+            date: new Date(2025, 3, 20),
             title: `${companyName} Partnership Announcement`,
             type: 'announcement',
             impact: 35,
             description: `${companyName} announces strategic partnership with leading cybersecurity firm to enhance platform security. https://www.google.com/search?q="${companyName}"+partnership+cybersecurity+2025&tbm=nws`
           },
           {
-            date: new Date(2025, 4, 15), // May 15, 2025
+            date: new Date(2025, 4, 10),
+            title: `${companyName} Executive Leadership Transition`,
+            type: 'announcement',
+            impact: 15,
+            description: `${companyName} announces planned transition of Chief Operating Officer as part of strategic leadership evolution. https://www.google.com/search?q="${companyName}"+COO+transition+2025&tbm=nws`
+          },
+          {
+            date: new Date(2025, 4, 15),
             title: `${companyName} Q1 2025 Earnings Beat`,
             type: 'announcement',
             impact: 40,
             description: `${companyName} reports strong Q1 2025 results, beating analyst expectations despite earlier challenges. https://www.google.com/search?q="${companyName}"+Q1+2025+earnings+beat&tbm=nws`
           },
           {
-            date: new Date(2025, 5, 10), // Jun 10, 2025
+            date: new Date(2025, 5, 1),
+            title: `${companyName} Appoints New Chief Financial Officer`,
+            type: 'announcement',
+            impact: 25,
+            description: `${companyName} names experienced financial executive as new CFO to drive growth strategy and financial operations. https://www.google.com/search?q="${companyName}"+new+CFO+appointment+2025&tbm=nws`
+          },
+          {
+            date: new Date(2025, 5, 10),
             title: `${companyName} Connect 2025 Conference`,
             type: 'announcement',
             impact: 30,
             description: `${companyName} hosts annual Connect conference showcasing new features and customer success stories. https://www.google.com/search?q="${companyName}"+Connect+2025+conference&tbm=nws`
           },
           {
-            date: new Date(2025, 5, 25), // Jun 25, 2025
+            date: new Date(2025, 5, 25),
             title: `${companyName} Industry Recognition`,
             type: 'external',
             impact: 25,
@@ -482,16 +497,28 @@ export class AgentSwarmService {
             description: `${companyName} launches new digital banking platform with enhanced security features. https://www.google.com/search?q="${companyName}"+digital+banking+launch+2025&tbm=nws`
           },
           {
+            date: new Date(2025, 2, 1),
+            title: `${companyName} Names New Chief Risk Officer`,
+            type: 'announcement',
+            impact: 20,
+            description: `${companyName} appoints seasoned risk management executive as new CRO to strengthen compliance and oversight. https://www.google.com/search?q="${companyName}"+new+CRO+appointment&tbm=nws`
+          },
+          {
             date: new Date(2025, 3, 10),
             title: `${companyName} Federal Reserve Review`,
             type: 'external',
             impact: -30,
             description: `Federal Reserve announces routine examination of ${companyName} lending practices. https://www.google.com/search?q="${companyName}"+Federal+Reserve+review+2025&tbm=nws`
+          },
+          {
+            date: new Date(2025, 4, 5),
+            title: `${companyName} CEO Succession Planning`,
+            type: 'announcement',
+            impact: 10,
+            description: `${companyName} board announces comprehensive CEO succession planning process for long-term leadership continuity. https://www.google.com/search?q="${companyName}"+CEO+succession+planning&tbm=nws`
           }
         );
       }
-      
-      // Add more events for other industries as needed
     }
     
     return events.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -784,25 +811,20 @@ export class AgentSwarmService {
     this.notifySubscribers();
   }
 
-  // FIXED: Generate realistic sentiment data with proper date ranges
   private generateRealSentimentData(companyName: string): SentimentData[] {
     const data: SentimentData[] = [];
     const startDate = new Date('2025-01-01T00:00:00Z');
     const today = new Date();
     const daysDiff = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Calculate base sentiment from collected real data
     let baseSentiment = this.calculateBaseSentimentFromCollectedData();
     
-    // Generate daily data points
     for (let i = 0; i < daysDiff; i++) {
       const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
       
-      // Add realistic daily variation
       const dailyVariation = (Math.random() - 0.5) * 20;
       const sentiment = Math.round(Math.max(-100, Math.min(100, baseSentiment + dailyVariation)));
       
-      // Calculate volume based on collected data
       const baseVolume = this.calculateVolumeFromCollectedData();
       const volume = Math.floor(baseVolume * (0.8 + Math.random() * 0.4));
       
@@ -818,12 +840,10 @@ export class AgentSwarmService {
     return data;
   }
 
-  // FIXED: Generate hourly data with proper timestamps
   private generateRealHourlyData(companyName: string): SentimentData[] {
     const data: SentimentData[] = [];
     const now = new Date();
     
-    // Calculate current sentiment from real data
     const currentSentiment = this.calculateBaseSentimentFromCollectedData();
     
     for (let i = 24; i >= 0; i--) {
@@ -847,14 +867,12 @@ export class AgentSwarmService {
     let totalSentiment = 0;
     let totalWeight = 0;
 
-    // Factor in news sentiment (high weight)
     if (this.collectedData.newsArticles.length > 0) {
       const newsSentiment = this.analyzeNewsSentiment();
       totalSentiment += newsSentiment * 0.4;
       totalWeight += 0.4;
     }
 
-    // Factor in verified news sentiment (highest weight)
     if (this.collectedData.verifiedNewsArticles.length > 0) {
       const verifiedSentiment = this.collectedData.verifiedNewsArticles.reduce((sum, article) => {
         return sum + (article.category === 'threat' ? article.impact : Math.abs(article.impact));
@@ -863,7 +881,6 @@ export class AgentSwarmService {
       totalWeight += 0.3;
     }
 
-    // Factor in Reddit sentiment
     if (this.collectedData.redditPosts.length > 0) {
       const redditSentiment = this.collectedData.redditPosts.reduce((sum, post) => {
         return sum + Math.max(-100, Math.min(100, (post.score - 10) * 2));
@@ -872,14 +889,12 @@ export class AgentSwarmService {
       totalWeight += 0.2;
     }
 
-    // Factor in LinkedIn sentiment
     if (this.collectedData.linkedinData.posts.length > 0) {
       const linkedinSentiment = linkedinAgent.calculateLinkedInSentiment(this.collectedData.linkedinData);
       totalSentiment += linkedinSentiment * 0.1;
       totalWeight += 0.1;
     }
 
-    // If no data collected, return neutral with slight negative bias
     return totalWeight > 0 ? totalSentiment / totalWeight : -5;
   }
 
@@ -892,35 +907,22 @@ export class AgentSwarmService {
     totalVolume += this.collectedData.linkedinData.posts.length * 75;
     totalVolume += this.collectedData.linkedinData.companyUpdates.length * 200;
     
-    return Math.max(500, totalVolume); // Minimum base volume
+    return Math.max(500, totalVolume);
   }
 
   private async generateRealDataMetrics(): Promise<void> {
     if (!this.swarm) return;
 
-    // FIXED: Generate sentiment data from real sources with proper date ranges
     const sentimentData = this.generateRealSentimentData(this.swarm.companyName);
     const hourlyData = this.generateRealHourlyData(this.swarm.companyName);
     
-    // Generate KPIs based on real data
     const kpiMetrics = this.generateKPIsFromRealData();
-    
-    // Generate platform metrics from real data
     const platformMetrics = this.generatePlatformMetricsFromRealData();
-    
-    // Generate stakeholder segments from real data
     const stakeholderSegments = this.analyzeStakeholderSentiment();
-    
-    // Generate geographic data from real sources
     const geographicData = this.generateGeographicFromRealData();
-    
-    // Generate competitor data from real sources
     const competitorData = this.generateCompetitorFromRealData();
     
-    // FIXED: Use comprehensive crisis events with proper URLs
     const crisisEvents = this.generateCrisisEventsFromAllSources();
-    
-    // Use validated threats/opportunities from validator agent
     const threatsOpportunities = this.convertValidatedThreatsOpportunities();
 
     this.collectedMetrics = {
@@ -937,11 +939,9 @@ export class AgentSwarmService {
     };
   }
 
-  // FIXED: Generate crisis events from all sources including company events
   private generateCrisisEventsFromAllSources(): CrisisEvent[] {
     const events: CrisisEvent[] = [];
     
-    // Add verified crisis events if available
     if (this.crisisVerificationResult && this.crisisVerificationResult.verifiedEvents.length > 0) {
       this.crisisVerificationResult.verifiedEvents.forEach(verifiedEvent => {
         events.push({
@@ -954,7 +954,6 @@ export class AgentSwarmService {
       });
     }
     
-    // Add company events from company events collector
     if (this.collectedData.companyEvents.length > 0) {
       this.collectedData.companyEvents.forEach(companyEvent => {
         events.push({
@@ -967,7 +966,6 @@ export class AgentSwarmService {
       });
     }
     
-    // If no events from either source, generate fallback events
     if (events.length === 0) {
       const companyProfile = validatorAgent.getCompanyProfile(this.swarm!.companyName);
       if (companyProfile) {
@@ -996,7 +994,6 @@ export class AgentSwarmService {
   private convertValidatedThreatsOpportunities(): ThreatOpportunity[] {
     const items: ThreatOpportunity[] = [];
     
-    // Convert validated threats/opportunities from validator agent
     this.collectedData.threatsOpportunities.forEach((item, index) => {
       items.push({
         id: `validated-${item.type}-${index}`,
@@ -1010,7 +1007,6 @@ export class AgentSwarmService {
       });
     });
 
-    // Add verified news articles as threats/opportunities
     this.collectedData.verifiedNewsArticles.forEach((article, index) => {
       items.push({
         id: `verified-${article.category}-${index}`,
@@ -1046,7 +1042,6 @@ export class AgentSwarmService {
     let competitiveAdvantage = 0;
     let mediaMomentum = 50;
 
-    // Calculate from real data
     if (this.collectedData.newsArticles.length > 0) {
       overallSentiment = Math.round(this.analyzeNewsSentiment());
       mediaMomentum = Math.round(Math.min(100, this.collectedData.newsArticles.length * 10));
@@ -1076,7 +1071,6 @@ export class AgentSwarmService {
   private generatePlatformMetricsFromRealData(): PlatformMetrics[] {
     const platforms: PlatformMetrics[] = [];
 
-    // Reddit platform data
     if (this.collectedData.redditPosts.length > 0) {
       const redditSentiment = Math.round(this.collectedData.redditPosts.reduce((sum, post) => {
         return sum + Math.max(-100, Math.min(100, (post.score - 10) * 2));
@@ -1092,7 +1086,6 @@ export class AgentSwarmService {
       });
     }
 
-    // LinkedIn platform data
     if (this.collectedData.linkedinData.posts.length > 0) {
       const linkedinSentiment = Math.round(linkedinAgent.calculateLinkedInSentiment(this.collectedData.linkedinData));
       
@@ -1106,7 +1099,6 @@ export class AgentSwarmService {
       });
     }
 
-    // News Media platform data
     if (this.collectedData.newsArticles.length > 0) {
       platforms.push({
         platform: 'News Media',
@@ -1118,7 +1110,6 @@ export class AgentSwarmService {
       });
     }
 
-    // Verified News Media platform data
     if (this.collectedData.verifiedNewsArticles.length > 0) {
       const verifiedSentiment = this.collectedData.verifiedNewsArticles.reduce((sum, article) => {
         return sum + (article.category === 'threat' ? article.impact : Math.abs(article.impact));
@@ -1134,7 +1125,6 @@ export class AgentSwarmService {
       });
     }
 
-    // Add other platforms with estimated data if we have limited real data
     if (platforms.length < 4) {
       platforms.push(
         {
@@ -1211,7 +1201,6 @@ export class AgentSwarmService {
         });
       });
     } else {
-      // Fallback regions with estimated data
       const defaultRegions = [
         { region: 'North America', lat: 39.8283, lng: -98.5795 },
         { region: 'Europe', lat: 54.5260, lng: 15.2551 },
@@ -1247,7 +1236,6 @@ export class AgentSwarmService {
         });
       });
     } else {
-      // Fallback competitors
       const defaultCompetitors = ['Competitor A', 'Competitor B', 'Competitor C'];
       defaultCompetitors.forEach(name => {
         const sentiment = Math.round(-10 + Math.random() * 30);

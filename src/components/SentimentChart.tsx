@@ -13,7 +13,7 @@ interface SentimentChartProps {
   onTimeframeChange?: (timeframe: '24h' | '7d' | '30d' | '1y' | 'all') => void;
   hasVerifiedCrisis?: boolean;
   crisisVerificationConfidence?: number;
-  totalCollectedDataPoints?: number; // NEW: Pass total collected data points from agents
+  totalCollectedDataPoints?: number;
 }
 
 export const SentimentChart: React.FC<SentimentChartProps> = ({ 
@@ -24,7 +24,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   onTimeframeChange,
   hasVerifiedCrisis = false,
   crisisVerificationConfidence = 0,
-  totalCollectedDataPoints = 0 // NEW: Default to 0 if not provided
+  totalCollectedDataPoints = 0
 }) => {
   const [timeframe, setTimeframe] = useState<'24h' | '7d' | '30d' | '1y' | 'all'>('30d');
 
@@ -38,30 +38,21 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
   const { chartData, filteredEvents, dateRange, rangeMetrics, eventMarkers } = useMemo(() => {
     const dateRange = getDateRange(timeframe);
     
-    // Use correct dataset based on timeframe
     let dataset = timeframe === '24h' ? hourlyData : data;
     
-    // Apply precise filtering based on exact date range
     const filteredData = filterDataByDateRange(dataset, dateRange);
-    
-    // Filter events within the date range
     const filteredEvents = filterEventsByDateRange(events, dateRange);
     
-    // Calculate metrics for this exact filtered data
     const rangeMetrics = calculateRangeMetrics(filteredData, dateRange);
     
-    // Format chart data with consistent date formatting
     const chartData = filteredData.map(item => ({
       ...item,
       formattedTime: format(item.timestamp, dateRange.formatString),
       originalTimestamp: item.timestamp,
-      // Add a unique key for chart positioning
       chartIndex: filteredData.indexOf(item)
     }));
 
-    // FIXED: Create event markers that properly align with chart data
     const eventMarkers = filteredEvents.map((event, eventIndex) => {
-      // Find the data point closest to the event date
       let closestDataPoint = chartData[0];
       let minTimeDiff = Infinity;
       let closestIndex = 0;
@@ -75,7 +66,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         }
       });
 
-      // Use the chart data point's formatted time for exact positioning
       const xValue = closestDataPoint?.formattedTime || format(event.date, dateRange.formatString);
       
       return {
@@ -107,12 +97,9 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     }
   };
 
-  // FIXED: Create proper URLs for events based on company and event details
   const createEventUrl = (event: CrisisEvent): string => {
-    // Check if event already has a URL in description
     const urlMatch = event.description?.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/);
     if (urlMatch) {
-      // Clean the URL
       let cleanUrl = urlMatch[0]
         .replace(/</g, '<')
         .replace(/>/g, '>')
@@ -120,12 +107,11 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         .replace(/"/g, '"')
         .replace(/&#39;/g, "'")
         .replace(/&nbsp;/g, ' ')
-        .replace(/[<>"'\s]+$/, ''); // Remove trailing characters
+        .replace(/[<>"'\s]+$/, '');
       
       return cleanUrl;
     }
 
-    // Create a targeted Google News search for the specific event
     const eventKeywords = event.title
       .replace(/Alert:|Opportunity:|Crisis:|Response:/g, '')
       .replace(/\.\.\./g, '')
@@ -134,17 +120,15 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     const searchQuery = `"${companyName}" "${eventKeywords}"`;
     const encodedQuery = encodeURIComponent(searchQuery);
     
-    // Use Google News search with date filter
     const eventDate = event.date;
-    const startDate = new Date(eventDate.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days before
-    const endDate = new Date(eventDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days after
+    const startDate = new Date(eventDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const endDate = new Date(eventDate.getTime() + 7 * 24 * 60 * 60 * 1000);
     
     const dateFilter = `after:${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-${startDate.getDate().toString().padStart(2, '0')} before:${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')}`;
     
     return `https://www.google.com/search?q=${encodedQuery} ${encodeURIComponent(dateFilter)}&tbm=nws&sort=date`;
   };
 
-  // FIXED: Handle event URL clicks properly
   const handleEventUrlClick = (event: CrisisEvent, e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -153,7 +137,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
       window.open(eventUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error('Error opening event URL:', error);
-      // Fallback to basic company search
       const fallbackUrl = `https://www.google.com/search?q=${encodeURIComponent(`"${companyName}" news`)}&tbm=nws`;
       window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
     }
@@ -163,7 +146,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       
-      // Check if there's an event at this data point
       const eventAtPoint = eventMarkers.find(marker => marker.xValue === label);
       
       return (
@@ -182,7 +164,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             {format(data.originalTimestamp, 'MMM dd, yyyy HH:mm')}
           </p>
           
-          {/* FIXED: Show event information with proper URL handling */}
+          {/* FIXED: Remove bold formatting from key events */}
           {eventAtPoint && (
             <div className="mt-3 pt-3 border-t border-slate-600">
               <div className="flex items-center space-x-2 mb-1">
@@ -190,10 +172,10 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
                   className="w-3 h-3 rounded-full" 
                   style={{ backgroundColor: eventAtPoint.color }}
                 ></div>
-                <span className="text-xs font-medium text-white">Key Event</span>
+                <span className="text-xs text-white">Key Event</span>
                 {hasVerifiedCrisis && getVerificationIcon()}
               </div>
-              <p className="text-sm text-slate-200 font-medium">
+              <p className="text-sm text-slate-200">
                 {eventAtPoint.event.title}
               </p>
               <p className="text-xs text-slate-400 mt-1">
@@ -215,7 +197,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
                 </span>
               </div>
               
-              {/* FIXED: Add clickable link that always works */}
               <div className="mt-2 pt-2 border-t border-slate-600">
                 <button
                   onClick={(e) => handleEventUrlClick(eventAtPoint.event, e)}
@@ -281,7 +262,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
         </div>
       </div>
 
-      {/* Range Metrics Summary */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900 rounded-lg p-3">
           <div className="text-xs text-slate-400">Average Sentiment</div>
@@ -306,7 +286,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
           </div>
         </div>
         
-        {/* FIXED: Show actual collected data points from agents instead of chart data points */}
         <div className="bg-slate-900 rounded-lg p-3">
           <div className="text-xs text-slate-400">Collected Data Points</div>
           <div className="text-lg font-medium text-white">
@@ -349,7 +328,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="2 2" />
             
-            {/* FIXED: Crisis event markers - now properly visible and positioned */}
+            {/* FIXED: Crisis event markers - removed bold formatting */}
             {eventMarkers.map((marker, index) => (
               <ReferenceLine
                 key={`event-marker-${marker.id}`}
@@ -362,13 +341,12 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
                   position: index % 2 === 0 ? 'topLeft' : 'topRight',
                   fontSize: 11,
                   fill: marker.color,
-                  fontWeight: 'bold',
+                  fontWeight: 'normal', // FIXED: Changed from 'bold' to 'normal'
                   offset: 10
                 }}
               />
             ))}
             
-            {/* Add event dots on the line for better visibility */}
             {eventMarkers.map((marker, index) => (
               <ReferenceLine
                 key={`event-dot-${marker.id}`}
@@ -408,7 +386,6 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
           )}
         </div>
         <div className="flex items-center space-x-4">
-          {/* FIXED: Show chart data points separately from collected data points */}
           <span>Chart Points: <span className="text-white font-mono">{chartData.length.toLocaleString()}</span></span>
           <span>Collected Data: <span className="text-blue-400 font-mono">{totalCollectedDataPoints.toLocaleString()}</span></span>
           <span>Date Range: <span className="text-blue-400">{getDateRangeDisplayString(dateRange)}</span></span>
