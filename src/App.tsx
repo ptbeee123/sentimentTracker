@@ -409,7 +409,7 @@ function App() {
       />
       
       <main className="p-6">
-        {/* FIXED: Data Collection Status Banner - Now shows accurate date range */}
+        {/* FIXED: Data Collection Status Banner - Now shows accurate data point count from filtered data */}
         <div className="mb-6 bg-slate-800 border border-slate-700 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -432,6 +432,7 @@ function App() {
             </div>
             <div className="flex items-center space-x-6 text-sm text-slate-400">
               <span>Total Days: <span className="text-white font-mono">{dataStatus.totalDays}</span></span>
+              {/* FIXED: Show actual filtered data points instead of estimated */}
               <span>Data Points: <span className="text-white font-mono">{filteredMetrics.sentimentData.length.toLocaleString()}</span></span>
               <span>Last Update: <span className="text-green-400 font-mono">
                 {dataStatus.lastUpdate.toLocaleTimeString('en-US', { 

@@ -265,7 +265,7 @@ export const AgentSwarmMonitor: React.FC<AgentSwarmMonitorProps> = ({
                 )}
               </div>
 
-              {/* Data Sources Status */}
+              {/* FIXED: Data Sources Status - Now includes all agents */}
               <div className="mt-4 pt-4 border-t border-slate-700">
                 <h4 className="text-xs font-medium text-slate-400 mb-2">Active Sources</h4>
                 <div className="space-y-1">
@@ -286,6 +286,22 @@ export const AgentSwarmMonitor: React.FC<AgentSwarmMonitorProps> = ({
                     }`}></div>
                   </div>
                   <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300">LinkedIn Network</span>
+                    <div className={`w-2 h-2 rounded-full ${
+                      swarm.agents.find(a => a.id === 'linkedin-collector')?.status === 'completed' ? 'bg-green-400' :
+                      swarm.agents.find(a => a.id === 'linkedin-collector')?.status === 'collecting' ? 'bg-blue-400 animate-pulse' :
+                      'bg-slate-500'
+                    }`}></div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300">Verified News</span>
+                    <div className={`w-2 h-2 rounded-full ${
+                      swarm.agents.find(a => a.id === 'verified-news-collector')?.status === 'completed' ? 'bg-green-400' :
+                      swarm.agents.find(a => a.id === 'verified-news-collector')?.status === 'collecting' ? 'bg-blue-400 animate-pulse' :
+                      'bg-slate-500'
+                    }`}></div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-300">Financial APIs</span>
                     <div className={`w-2 h-2 rounded-full ${
                       swarm.agents.find(a => a.id === 'financial-collector')?.status === 'completed' ? 'bg-green-400' :
@@ -294,10 +310,18 @@ export const AgentSwarmMonitor: React.FC<AgentSwarmMonitorProps> = ({
                     }`}></div>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300">Threat Scanner</span>
+                    <span className="text-slate-300">Crisis Verifier</span>
                     <div className={`w-2 h-2 rounded-full ${
-                      swarm.agents.find(a => a.id === 'threat-collector')?.status === 'completed' ? 'bg-green-400' :
-                      swarm.agents.find(a => a.id === 'threat-collector')?.status === 'collecting' ? 'bg-blue-400 animate-pulse' :
+                      swarm.agents.find(a => a.id === 'crisis-verifier')?.status === 'completed' ? 'bg-green-400' :
+                      swarm.agents.find(a => a.id === 'crisis-verifier')?.status === 'collecting' ? 'bg-blue-400 animate-pulse' :
+                      'bg-slate-500'
+                    }`}></div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300">Business Validator</span>
+                    <div className={`w-2 h-2 rounded-full ${
+                      swarm.agents.find(a => a.id === 'validator-agent')?.status === 'completed' ? 'bg-green-400' :
+                      swarm.agents.find(a => a.id === 'validator-agent')?.status === 'collecting' ? 'bg-blue-400 animate-pulse' :
                       'bg-slate-500'
                     }`}></div>
                   </div>
