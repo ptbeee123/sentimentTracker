@@ -105,51 +105,55 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     }
   };
 
-  // FIXED: Extract and clean URLs from event descriptions
-  const extractEventUrl = (event: any): string | null => {
-    if (!event || !event.description) return null;
-    
-    // Look for URLs in the description
-    const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
-    const urls = event.description.match(urlRegex);
-    
-    if (urls && urls.length > 0) {
-      // Clean the URL by removing any trailing HTML entities or characters
-      let cleanUrl = urls[0]
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
+  // FIXED: Create proper URLs for events based on company and event details
+  const createEventUrl = (event: CrisisEvent): string => {
+    // Check if event already has a URL in description
+    const urlMatch = event.description?.match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/);
+    if (urlMatch) {
+      // Clean the URL
+      let cleanUrl = urlMatch[0]
+        .replace(/</g, '<')
+        .replace(/>/g, '>')
+        .replace(/&/g, '&')
+        .replace(/"/g, '"')
         .replace(/&#39;/g, "'")
-        .replace(/&nbsp;/g, ' ');
-      
-      // Remove any trailing punctuation or HTML tags
-      cleanUrl = cleanUrl.replace(/[<>"'\s]+$/, '');
+        .replace(/&nbsp;/g, ' ')
+        .replace(/[<>"'\s]+$/, ''); // Remove trailing characters
       
       return cleanUrl;
     }
+
+    // Create a targeted Google News search for the specific event
+    const eventKeywords = event.title
+      .replace(/Alert:|Opportunity:|Crisis:|Response:/g, '')
+      .replace(/\.\.\./g, '')
+      .trim();
     
-    return null;
+    const searchQuery = `"${companyName}" "${eventKeywords}"`;
+    const encodedQuery = encodeURIComponent(searchQuery);
+    
+    // Use Google News search with date filter
+    const eventDate = event.date;
+    const startDate = new Date(eventDate.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days before
+    const endDate = new Date(eventDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days after
+    
+    const dateFilter = `after:${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-${startDate.getDate().toString().padStart(2, '0')} before:${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')}`;
+    
+    return `https://www.google.com/search?q=${encodedQuery} ${encodeURIComponent(dateFilter)}&tbm=nws&sort=date`;
   };
 
   // FIXED: Handle event URL clicks properly
-  const handleEventUrlClick = (event: any, e: React.MouseEvent) => {
+  const handleEventUrlClick = (event: CrisisEvent, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    const eventUrl = extractEventUrl(event);
-    if (eventUrl) {
-      try {
-        window.open(eventUrl, '_blank', 'noopener,noreferrer');
-      } catch (error) {
-        console.error('Error opening event URL:', error);
-        // Fallback to Google search
-        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`"${companyName}" "${event.title}"`)}`;
-        window.open(searchUrl, '_blank', 'noopener,noreferrer');
-      }
-    } else {
-      // Fallback to Google search if no URL found
-      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`"${companyName}" "${event.title}"`)}`;
-      window.open(searchUrl, '_blank', 'noopener,noreferrer');
+    try {
+      const eventUrl = createEventUrl(event);
+      window.open(eventUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Error opening event URL:', error);
+      // Fallback to basic company search
+      const fallbackUrl = `https://www.google.com/search?q=${encodeURIComponent(`"${companyName}" news`)}&tbm=nws`;
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -209,19 +213,20 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
                 </span>
               </div>
               
-              {/* FIXED: Add clickable link if URL is available */}
-              {extractEventUrl(eventAtPoint.event) && (
-                <div className="mt-2 pt-2 border-t border-slate-600">
-                  <button
-                    onClick={(e) => handleEventUrlClick(eventAtPoint.event, e)}
-                    className="flex items-center space-x-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                    title="Click to read full article"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    <span>Read full article</span>
-                  </button>
+              {/* FIXED: Add clickable link that always works */}
+              <div className="mt-2 pt-2 border-t border-slate-600">
+                <button
+                  onClick={(e) => handleEventUrlClick(eventAtPoint.event, e)}
+                  className="flex items-center space-x-1 text-xs text-blue-400 hover:text-blue-300 transition-colors w-full text-left"
+                  title="Click to search for related news articles"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  <span>Search for related articles</span>
+                </button>
+                <div className="text-xs text-slate-500 mt-1">
+                  Opens targeted news search for this event
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
