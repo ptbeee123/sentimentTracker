@@ -52,31 +52,41 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
     const chartData = filteredData.map(item => ({
       ...item,
       formattedTime: format(item.timestamp, dateRange.formatString),
-      originalTimestamp: item.timestamp
+      originalTimestamp: item.timestamp,
+      // Add a unique key for chart positioning
+      chartIndex: filteredData.indexOf(item)
     }));
 
-    // FIXED: Create event markers that align with chart data points
-    const eventMarkers = filteredEvents.map(event => {
-      // Find the closest data point to the event date
+    // FIXED: Create event markers that properly align with chart data
+    const eventMarkers = filteredEvents.map((event, eventIndex) => {
+      // Find the data point closest to the event date
       let closestDataPoint = chartData[0];
       let minTimeDiff = Infinity;
+      let closestIndex = 0;
       
-      chartData.forEach(point => {
+      chartData.forEach((point, index) => {
         const timeDiff = Math.abs(point.originalTimestamp.getTime() - event.date.getTime());
         if (timeDiff < minTimeDiff) {
           minTimeDiff = timeDiff;
           closestDataPoint = point;
+          closestIndex = index;
         }
       });
 
+      // Use the chart data point's formatted time for exact positioning
+      const xValue = closestDataPoint?.formattedTime || format(event.date, dateRange.formatString);
+      
       return {
+        id: `event-${eventIndex}`,
         event,
         dataPoint: closestDataPoint,
-        xValue: closestDataPoint?.formattedTime || format(event.date, dateRange.formatString),
+        xValue,
+        chartIndex: closestIndex,
         color: event.type === 'crisis' ? '#EF4444' : 
                event.type === 'response' ? '#3B82F6' : 
                event.type === 'announcement' ? '#10B981' : '#F59E0B',
-        label: event.title.length > 25 ? event.title.substring(0, 25) + '...' : event.title
+        label: event.title.length > 30 ? event.title.substring(0, 30) + '...' : event.title,
+        shortLabel: event.title.length > 15 ? event.title.substring(0, 15) + '...' : event.title
       };
     });
 
@@ -103,7 +113,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
       const eventAtPoint = eventMarkers.find(marker => marker.xValue === label);
       
       return (
-        <div className="bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-lg">
+        <div className="bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-lg max-w-sm">
           <p className="text-slate-300 font-medium">{label}</p>
           <p className="text-blue-400">
             Sentiment: <span className="font-mono">{data.sentiment}</span>
@@ -126,7 +136,8 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
                   className="w-3 h-3 rounded-full" 
                   style={{ backgroundColor: eventAtPoint.color }}
                 ></div>
-                <span className="text-xs font-medium text-white">Crisis Event</span>
+                <span className="text-xs font-medium text-white">Key Event</span>
+                {hasVerifiedCrisis && getVerificationIcon()}
               </div>
               <p className="text-sm text-slate-200 font-medium">
                 {eventAtPoint.event.title}
@@ -177,7 +188,7 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             <span className="ml-2 text-xs">
               ({getDateRangeDisplayString(dateRange)})
             </span>
-            {hasVerifiedCrisis && eventMarkers.length > 0 && (
+            {eventMarkers.length > 0 && (
               <span className="ml-2 text-xs text-green-400">
                 • {eventMarkers.length} key event{eventMarkers.length > 1 ? 's' : ''} marked
               </span>
@@ -245,26 +256,46 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             {eventMarkers.length}
           </div>
           <div className="text-xs text-slate-500">
-            {hasVerifiedCrisis ? 'Verified & marked' : 'No verified events'}
+            {hasVerifiedCrisis ? 'Verified & marked' : 'In timeframe'}
           </div>
         </div>
       </div>
 
-      {/* Event Legend - Show if there are events */}
+      {/* FIXED: Event Legend - Always show if there are events, with better visibility */}
       {eventMarkers.length > 0 && (
-        <div className="mb-4 p-3 bg-slate-900 rounded-lg">
-          <div className="text-xs text-slate-400 mb-2">Key Events Legend:</div>
-          <div className="flex flex-wrap gap-3">
+        <div className="mb-4 p-4 bg-slate-900 rounded-lg border border-slate-600">
+          <div className="flex items-center space-x-2 mb-3">
+            <div className="text-sm font-medium text-white">Key Events in Timeline:</div>
+            {hasVerifiedCrisis && (
+              <div className="flex items-center space-x-1">
+                {getVerificationIcon()}
+                <span className="text-xs text-green-400">Verified</span>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-2">
             {eventMarkers.map((marker, index) => (
-              <div key={index} className="flex items-center space-x-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
-                  style={{ backgroundColor: marker.color }}
-                ></div>
-                <span className="text-xs text-slate-300">{marker.label}</span>
-                <span className="text-xs text-slate-500">
-                  ({format(marker.event.date, 'MMM dd')})
-                </span>
+              <div key={index} className="flex items-center justify-between p-2 bg-slate-800 rounded border-l-4" 
+                   style={{ borderLeftColor: marker.color }}>
+                <div className="flex items-center space-x-3">
+                  <div 
+                    className="w-3 h-3 rounded-full flex-shrink-0" 
+                    style={{ backgroundColor: marker.color }}
+                  ></div>
+                  <div className="flex-1">
+                    <div className="text-sm text-white font-medium">{marker.label}</div>
+                    <div className="text-xs text-slate-400">
+                      {format(marker.event.date, 'MMM dd, yyyy')} • {marker.event.type}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className={`text-sm font-mono ${
+                    marker.event.impact > 0 ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {marker.event.impact > 0 ? '+' : ''}{marker.event.impact}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -289,20 +320,36 @@ export const SentimentChart: React.FC<SentimentChartProps> = ({
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="2 2" />
             
-            {/* FIXED: Crisis event markers - properly positioned and visible */}
+            {/* FIXED: Crisis event markers - now properly visible and positioned */}
             {eventMarkers.map((marker, index) => (
               <ReferenceLine
-                key={`event-${index}`}
+                key={`event-marker-${marker.id}`}
                 x={marker.xValue}
                 stroke={marker.color}
-                strokeWidth={2}
-                strokeDasharray="5 5"
+                strokeWidth={3}
+                strokeDasharray="6 4"
                 label={{ 
-                  value: `${marker.event.type.toUpperCase()}: ${marker.label}`, 
+                  value: `${marker.event.type.toUpperCase()}`, 
                   position: index % 2 === 0 ? 'topLeft' : 'topRight',
-                  fontSize: 10,
+                  fontSize: 11,
                   fill: marker.color,
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
+                  offset: 10
+                }}
+              />
+            ))}
+            
+            {/* Add event dots on the line for better visibility */}
+            {eventMarkers.map((marker, index) => (
+              <ReferenceLine
+                key={`event-dot-${marker.id}`}
+                x={marker.xValue}
+                stroke="transparent"
+                dot={{
+                  fill: marker.color,
+                  stroke: '#1e293b',
+                  strokeWidth: 2,
+                  r: 6
                 }}
               />
             ))}
