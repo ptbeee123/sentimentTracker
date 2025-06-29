@@ -159,8 +159,8 @@ function App() {
       setIsLoading(true);
       
       // Simulate agent swarm data collection delay
-      setTimeout(() => {
-        const metrics = generateCompanyMetrics(name);
+      setTimeout(async () => {
+        const metrics = await generateCompanyMetrics(name);
         setCompanyMetrics(metrics);
         setIsLoading(false);
         setLastUpdate(new Date());
@@ -274,11 +274,11 @@ function App() {
   useEffect(() => {
     if (!filteredMetrics?.validation.isValid) return;
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       setLastUpdate(new Date());
       // Minor data refresh simulation - in real app this would be WebSocket updates
       if (Math.random() > 0.95) { // 5% chance of refresh
-        const refreshedMetrics = generateCompanyMetrics(companyName);
+        const refreshedMetrics = await generateCompanyMetrics(companyName);
         if (refreshedMetrics) {
           setCompanyMetrics(refreshedMetrics);
         }
